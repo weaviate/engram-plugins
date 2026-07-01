@@ -1,0 +1,29 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/with-venv.sh\" -m core.hooks.search",
+            "statusMessage": "Recalling memories from Engram…"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/with-venv.sh\" -m core.hooks.store",
+            "asyncRewake": true,
+            "statusMessage": "Saving memory to Engram…"
+          }
+        ]
+      }
+    ]
+  }
+}

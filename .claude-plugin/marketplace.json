@@ -1,0 +1,14 @@
+{
+  "name": "weaviate-engram",
+  "owner": { "name": "Weaviate" },
+  "metadata": {
+    "description": "Engram-backed persistent memory for coding assistants."
+  },
+  "plugins": [
+    {
+      "name": "engram",
+      "source": "./plugin",
+      "description": "Persistent cross-session memory backed by Weaviate Engram (Claude Code)."
+    }
+  ]
+}
