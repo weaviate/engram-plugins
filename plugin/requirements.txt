@@ -1,0 +1,6 @@
+# Runtime dependency installed into the plugin venv by hooks/ensure_deps.py.
+# Only the third-party Engram SDK lives here — the `core` package itself ships
+# inside this plugin dir and is imported from CLAUDE_PLUGIN_ROOT (see hooks/with-venv.sh),
+# so it is never pip-installed. Capped below the next major to keep a breaking release from
+# silently landing on first run.
+weaviate-engram>=1.0.0,<2.0.0
