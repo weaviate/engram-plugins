@@ -40,7 +40,7 @@ def git_out(cwd, args):
 
 def git_repo(cwd):
     """owner-scoped repo name from the git remote:
-    git@github.com:organization/repository.git -> organization-repository."""
+    git@github.com:organization/repository.git -> organization/repository."""
     url = git_out(cwd, ["remote", "get-url", "origin"])
     if not url:
         return None
@@ -48,8 +48,5 @@ def git_repo(cwd):
     for p in ("https://", "http://", "ssh://", "git://", "git@"):
         if slug.startswith(p):
             slug = slug[len(p) :]
-    slug = slug.replace(":", "/")
-    parts = [p for p in slug.split("/") if p]
-    if len(parts) >= 2:
-        return f"{parts[-2]}-{parts[-1]}"
-    return parts[-1] if parts else None
+    parts = [p for p in slug.replace(":", "/").split("/") if p]
+    return "/".join(parts[-2:]) or None

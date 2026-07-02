@@ -24,7 +24,7 @@ VALID_TOKENS = ("git-repo", "cwd", "session_id")
 
 def _resolve_token(token, cwd, session_id):
     """Resolve a built-in source token (no arguments): "git-repo" (owner-scoped repo name from the
-    remote, e.g. owner-repo), "cwd", or "session_id" (the last two from the hook payload). Unknown
+    remote, e.g. owner/repo), "cwd", or "session_id" (the last two from the hook payload). Unknown
     token → None."""
     if token == "git-repo":
         return git_repo(cwd)
