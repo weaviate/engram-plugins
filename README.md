@@ -40,19 +40,19 @@ When Engram project uses `user_id` to isolate memories, it ties it to:
 
 If you have customized your Engram project (custom topics and property scopes), you may need or want to customize how scopes are resolved.
 
-- **Global** — `~/.engram.json`: your defaults, everywhere. Full flexibility, including the
+- **Global** — `~/.engram/config.json`: your defaults, everywhere. Full flexibility, including the
   dynamic sources below.
 - **Per-directory** — `.engram.json` in a project: allows providing static property values per-directory manually.
 
 ### Full custom configuration example
 
-Global `~/.engram.json`:
+Global `~/.engram/config.json`:
 
-```jsonc
+```json
 {
   "properties": {
     "codebase": { "from": "git-repo" },
-    "chat": { "from": "session_id" },
+    "chat": { "from": "session_id" }
   },
   "search": {
     "properties": ["codebase"],
@@ -60,9 +60,9 @@ Global `~/.engram.json`:
       "tooling_preferences",
       "product_summary",
       { "name": "product_knowledge", "properties": ["product"] },
-      { "name": "change_summary", "clear_properties": ["codebase"] },
-    ],
-  },
+      { "name": "change_summary", "clear_properties": ["codebase"] }
+    ]
+  }
 }
 ```
 
@@ -72,11 +72,11 @@ Search is broad by default; adding `codebase` as a search property narrows recal
 
 If you want to configure some static property values inside directory manually, you'll need to do this for every working directory. Per-directory `./.engram.json`:
 
-```jsonc
+```json
 {
   "properties": {
-    "product": "payments",
-  },
+    "product": "payments"
+  }
 }
 ```
 
@@ -93,7 +93,7 @@ The JSON **shape** decides — no ambiguity:
   - `{ "cmd": ["prog", "arg", …] }` — output of a command, run directly (no shell).
 - **array** → a **cascade**: entries are tried in order, first non-empty wins e.g. `[{ "cmd": ["git", "branch", "--show-current"] }, "fallback"]`.
 
-> **Dynamic sources (`from`/`cmd` and cascades) are honored only in your global `~/.engram.json`.**
+> **Dynamic sources (`from`/`cmd` and cascades) are honored only in your global `~/.engram/config.json`.**
 > A committed per-directory `.engram.json` may set **literals only**.
 
 ### Search scope

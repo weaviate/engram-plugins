@@ -1,13 +1,13 @@
-"""Config from JSON files: ~/.engram.json (global) plus the current directory's .engram.json.
-Holds scope `properties` (how each value resolves) and `search` (which topics/properties to
-filter). No env vars, no shell quoting — structured config lives in files."""
+"""Config from JSON files: ~/.engram/config.json (global) plus the current directory's
+.engram.json. Holds scope `properties` (how each value resolves) and `search` (which
+topics/properties to filter). No env vars, no shell quoting — structured config lives in files."""
 
 import json
 import os
 
-# The global config: the outermost .engram.json. Same filename as the per-repo files, so the
-# whole chain is one concept — ~/.engram.json holds your defaults, repos override nearest-wins.
-USER_CONFIG_PATH = "~/.engram.json"
+# The global (user-owned) config. A ~/.engram/ dir rather than a bare dotfile keeps it extensible;
+# it holds your defaults, overridden by the current directory's .engram.json.
+USER_CONFIG_PATH = "~/.engram/config.json"
 
 
 def user_config_path():
@@ -30,19 +30,11 @@ def _read_json(path):
 def _config_chain(cwd):
     """Config in increasing-precedence order: the global user config, then the .engram.json in the
     current directory (cwd overrides the global defaults)."""
-    paths = [user_config_path(), os.path.join(os.path.realpath(cwd), ".engram.json")]
-    # dedupe by resolved path: the global file can coincide with cwd's (e.g. cwd is $HOME).
-    seen, deduped = set(), []
-    for p in paths:
-        key = os.path.realpath(os.path.expanduser(p))
-        if key not in seen:
-            seen.add(key)
-            deduped.append(p)
-    return deduped
+    return [user_config_path(), os.path.join(os.path.realpath(cwd), ".engram.json")]
 
 
 def load_config(cwd):
-    """Merge config from the global ~/.engram.json and the current directory's .engram.json (cwd
+    """Merge config from the global ~/.engram/config.json and the current directory's .engram.json (cwd
     overrides). `properties` merge key-wise; `search` takes the deepest defined block.
 
     Dynamic sources ({"from"|"cmd"} objects and cascades) are honored ONLY from the global config,
@@ -66,7 +58,7 @@ def load_config(cwd):
                     else:
                         cfg["warnings"].append(
                             f"properties.{k} in {path}: dynamic sources are only allowed in "
-                            "~/.engram.json — ignored (use a literal here, or move it to global)"
+                            "~/.engram/config.json — ignored (use a literal here, or move it to global)"
                         )
                 else:
                     cfg["properties"][k] = str(v)
