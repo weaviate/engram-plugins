@@ -33,14 +33,24 @@ def _config_chain(cwd):
     return [user_config_path(), os.path.join(os.path.realpath(cwd), ".engram.json")]
 
 
-def load_config(cwd):
-    """Merge config from the global ~/.engram/config.json and the current directory's .engram.json (cwd
-    overrides). `properties` merge key-wise; `search` takes the deepest defined block.
+def _contains_cmd(value):
+    """True if a property value uses a {"cmd": ...} source anywhere (including inside a cascade).
+    A cmd runs an arbitrary command, so it's refused from committed/local config."""
+    if isinstance(value, dict):
+        return "cmd" in value
+    if isinstance(value, list):
+        return any(_contains_cmd(el) for el in value)
+    return False
 
-    Dynamic sources ({"from"|"cmd"} objects and cascades) are honored ONLY from the global config,
-    which is user-owned. A committed per-directory .engram.json is limited to static literal values
-    — a repo you clone must never be able to run a {"cmd"} on your machine via a hook. A dynamic
-    value found in a local file is dropped and reported in `warnings`."""
+
+def load_config(cwd):
+    """Merge config from the global ~/.engram/config.json and the current directory's .engram.json
+    (cwd overrides). `properties` merge key-wise; `search` takes the deepest defined block.
+
+    `cmd` sources run an arbitrary command, so they're honored ONLY from the global config
+    (user-owned) — a repo you clone must never run a command on your machine via a hook. Literals
+    and `from` tokens (fixed built-in lookups, no arbitrary execution) are fine in a committed
+    .engram.json. A `cmd` found in a local file is dropped and reported in `warnings`."""
     cfg = {"properties": {}, "search": {}, "warnings": []}
     for i, path in enumerate(_config_chain(cwd)):
         part = _read_json(path)
@@ -48,18 +58,18 @@ def load_config(cwd):
         props = part.get("properties")
         if isinstance(props, dict):
             # JSON shape carries the meaning: string = literal, {"from"|"cmd"} = dynamic source,
-            # list = cascade. Locally only literals are allowed (dynamic would execute on clone).
+            # list = cascade. Only `cmd` is refused locally (it would execute on clone).
             for k, v in props.items():
                 if v is None:
                     continue
                 if isinstance(v, (dict, list)):
-                    if is_global:
-                        cfg["properties"][k] = v
-                    else:
+                    if not is_global and _contains_cmd(v):
                         cfg["warnings"].append(
-                            f"properties.{k} in {path}: dynamic sources are only allowed in "
-                            "~/.engram/config.json — ignored (use a literal here, or move it to global)"
+                            f'properties.{k} in {path}: a "cmd" source is only allowed in '
+                            "~/.engram/config.json — ignored (a cloned repo must not run commands)"
                         )
+                        continue
+                    cfg["properties"][k] = v
                 else:
                     cfg["properties"][k] = str(v)
         if isinstance(part.get("search"), dict):

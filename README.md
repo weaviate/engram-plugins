@@ -42,7 +42,7 @@ If you have customized your Engram project (custom topics and property scopes), 
 
 - **Global** — `~/.engram/config.json`: your defaults, everywhere. Full flexibility, including the
   dynamic sources below.
-- **Per-directory** — `.engram.json` in a project: allows providing static property values per-directory manually.
+- **Per-directory** — `.engram.json` in a project: committed, shared with your team. Literals and `from` tokens only — no `cmd` (see below).
 
 ### Full custom configuration example
 
@@ -93,8 +93,9 @@ The JSON **shape** decides — no ambiguity:
   - `{ "cmd": ["prog", "arg", …] }` — output of a command, run directly (no shell).
 - **array** → a **cascade**: entries are tried in order, first non-empty wins e.g. `[{ "cmd": ["git", "branch", "--show-current"] }, "fallback"]`.
 
-> **Dynamic sources (`from`/`cmd` and cascades) are honored only in your global `~/.engram/config.json`.**
-> A committed per-directory `.engram.json` may set **literals only**.
+> **`cmd` sources are honored only in your global `~/.engram/config.json`** — a cloned repo must
+> never run a command on your machine. A committed per-directory `.engram.json` may use literals
+> and `from` tokens, but a `cmd` there is ignored.
 
 ### Search scope
 
