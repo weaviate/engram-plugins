@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """UserPromptSubmit hook: search Engram for memories relevant to the prompt and inject them as
-additionalContext for the assistant to use. Recall and the display ride in the model's reply
-(additionalContext directive), not a hook `systemMessage`, so they render in every host.
+additionalContext for the assistant to use. Recalled memories are injected silently as context;
+warnings/errors ride in the model's reply (additionalContext directive), not a hook
+`systemMessage`, so they render in every host.
 
-Stateless — no per-session files. The "active" banner is injected every turn, but the directive
-tells the model to show it only if it hasn't already shown it this session (so: once per session,
-tracked from the conversation, not a flag file). Warnings/errors are scoped to the current reply
-and persist by being re-injected each turn — a fixed problem stops showing on its own."""
+Stateless — no per-session files. Success is silent. Warnings/errors are scoped to the current
+reply and persist by being re-injected each turn, so a fixed problem stops showing on its own."""
 
 import json
 import sys
@@ -24,31 +23,14 @@ def tag(message):
     return f"Engram · {message}"
 
 
-def _banner(user_id, resolved):
-    parts = [f"active · user={user_id or '?'}"]
-    if resolved:
-        parts.append(", ".join(f"{k}={v}" for k, v in resolved.items()))
-    return " · ".join(parts)
-
-
-def emit(status=None, banner=None, memories=None):
+def emit(status=None, memories=None):
     """UserPromptSubmit output. Everything rides in `additionalContext` so it renders in every
-    host via the model's reply (not a hook `systemMessage`, which GUI hosts drop). Stateless —
-    the once-vs-every-turn behavior lives in the directive wording, not in any file:
+    host via the model's reply (not a hook `systemMessage`, which GUI hosts drop):
 
-      - `banner` (the "active" session line): shown only if the model hasn't already shown an
-        Engram banner earlier in the conversation → once per session, tracked by the model.
       - `status` (warnings/errors): shown for THIS reply only; persistence comes from re-injection
         each turn, so a fixed problem stops showing on its own.
       - `memories`: offered as usable context, not echoed."""
     parts = []
-    if banner:
-        parts.append(
-            "Engram (memory plugin) session banner. If you have NOT already shown an Engram "
-            "status banner earlier in this conversation, begin your reply with the following line "
-            "verbatim; if you already showed it once this session, omit it and just answer:\n"
-            + banner
-        )
     if status:
         seen, unique = set(), []
         for line in status:
@@ -100,7 +82,7 @@ def main():
     # Resolving filters reads the scope schema from Engram; that and the search run under one
     # try, so a failure anywhere fails the whole operation with a single error.
     try:
-        topics, properties, warnings, resolved = search_filters(data.get("cwd", ""), session_id)
+        topics, properties, warnings = search_filters(data.get("cwd", ""), session_id)
         kwargs = {"properties": properties} if properties else {}
         results = client.memories.search(
             query=prompt, user_id=user_id, topics=topics, **kwargs
@@ -119,13 +101,8 @@ def main():
 
     bullets = "\n".join(f"- {m}" for m in memories)
 
-    # Banner: injected every turn, but the model shows it only once per session (it self-checks the
-    # conversation). Warnings: scoped to this reply, persist via re-injection. Memories: every turn.
-    emit(
-        status=[tag(w) for w in warnings] or None,
-        banner=tag(_banner(user_id, resolved)),
-        memories=bullets or None,
-    )
+    # Success is silent: warnings (if any) show this reply; memories are injected as context.
+    emit(status=[tag(w) for w in warnings] or None, memories=bullets or None)
     return 0
 
 

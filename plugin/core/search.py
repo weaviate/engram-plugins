@@ -62,9 +62,9 @@ def search_filters(cwd, session_id):
           the `topics` filter — RESTRICTS the search to these topics, with optional
           per-topic property filters.
 
-    Use either or both. Returns (topics, properties, warnings, resolved) — `resolved` is the
-    resolved scope (config + inferred defaults) used for the session banner; warnings flags any
-    configured/inferred scope property that didn't resolve to a value, so it won't be attached."""
+    Use either or both. Returns (topics, properties, warnings) — `warnings` flags config/topic
+    problems and any configured/inferred scope property that didn't resolve to a value (so it
+    won't be attached)."""
     cfg = load_config(cwd)
     search = cfg.get("search") or {}
     resolved, _user_required, unmapped = resolve_scope(cwd, session_id)
@@ -81,4 +81,4 @@ def search_filters(cwd, session_id):
             f"scope [{', '.join(unmapped)}] did not resolve and won't be attached — "
             'check the source/env in your .engram.json "properties".'
         )
-    return topics, (cross or None), warnings, resolved
+    return topics, (cross or None), warnings
