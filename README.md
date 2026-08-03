@@ -1,4 +1,4 @@
-# Weaviate Engram Integrations
+# Weaviate Engram Plugins
 
 Persistent, cross-session memory for **Claude Code**, backed by
 [Weaviate Engram](https://docs.weaviate.io/engram). Claude remembers your preferences,
@@ -22,7 +22,7 @@ export ENGRAM_API_KEY=...
 Inside Claude Code CLI session do:
 
 ```bash
-/plugin marketplace add weaviate/engram-integrations
+/plugin marketplace add weaviate/engram-plugins
 /plugin install engram@weaviate-engram
 /reload-plugins
 ```
