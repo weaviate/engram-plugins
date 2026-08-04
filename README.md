@@ -28,6 +28,13 @@ Inside Claude Code CLI session do:
 
 That's it. Memory starts working on your next prompt.
 
+## Commands
+
+- `/engram:import-memories` — one-shot import of Claude Code's local file-based memories
+  (`~/.claude/projects/*/memory/*.md`) into Engram. Each fact is tagged with the source
+  project's git origin repo (`repo_name`), so memories that were siloed per project become
+  recallable everywhere. Re-running only imports new or changed files.
+
 ## Identity
 
 When Engram project uses `user_id` to isolate memories, it ties it to:
