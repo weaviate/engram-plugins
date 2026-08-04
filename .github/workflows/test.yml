@@ -1,0 +1,32 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  hermes-provider:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Syntax checks
+        run: |
+          bash -n hermes/install.sh
+          bash -n plugin/hooks/with-venv.sh
+          python -m compileall -q hermes/engram plugin/core
+
+      - name: Install pytest
+        run: pip install pytest
+
+      - name: Run Hermes provider tests
+        run: python -m pytest hermes/tests -v

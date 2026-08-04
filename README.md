@@ -1,8 +1,15 @@
 # Weaviate Engram Plugins
 
-Persistent, cross-session memory for **Claude Code**, backed by
-[Weaviate Engram](https://docs.weaviate.io/engram). Claude remembers your preferences,
+Persistent, cross-session memory for AI assistants, backed by
+[Weaviate Engram](https://docs.weaviate.io/engram). Your assistant remembers your preferences,
 decisions, and project context across sessions — and recalls what's relevant before it answers.
+
+## Integrations
+
+- **Claude Code** — the `engram` plugin in [`plugin/`](plugin) (install below).
+- **Hermes Agent** — the memory provider in [`hermes/`](hermes); see [`hermes/README.md`](hermes/README.md).
+
+## Claude Code
 
 - **Recall** — before each answer, relevant memories are fetched and added to the conversation.
 - **Store** — after each turn, the exchange is saved so it can be recalled later.
