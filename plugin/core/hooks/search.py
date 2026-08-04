@@ -40,13 +40,13 @@ def emit(status=None, memories=None):
         parts.append(
             "Engram (memory plugin) status for the user. For THIS reply only, begin your reply "
             "with the following line(s) verbatim, then answer normally — do not repeat them in "
-            "later replies unless they appear here again:\n"
-            + "\n".join(unique)
+            "later replies unless they appear here again:\n" + "\n".join(unique)
         )
     if memories:
         parts.append(
             "Relevant long-term memories about this user (from Engram). Use them if helpful; "
-            "ignore if irrelevant:\n" + memories
+            "ignore if irrelevant. Briefly mention when Engram memory informs your answer:\n"
+            + memories
         )
     if parts:
         print(
