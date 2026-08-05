@@ -27,26 +27,45 @@ DEFAULT_DIR = "~/.claude/projects"
 def decode_project_dir(name):
     """Decode a munged project dir name (e.g. '-Users-me-src-repo--bare') back to candidate
     absolute paths. The munging maps '/' and '.' to '-' and keeps literal '-', so each '-'
-    is a three-way branch; pruning against real directories keeps the search tiny. A
-    candidate must re-munge to exactly `name`, which also rejects paths mangled by
-    accidental '..' components."""
-    matches = []
+    is a three-way branch — but every branch is pruned against the real directory listing
+    (a component prefix that matches no entry is dead), which bounds the search by what
+    exists on disk instead of exponential in the dash count (an unpruned search hangs on
+    ~25 dashes — an ordinary deep kebab-case path). Iterative on an explicit stack so a
+    pathological name can't hit the recursion limit. A candidate must re-munge to exactly
+    `name`, which also rejects paths mangled by accidental '..' components."""
+    if not name.startswith("-"):
+        return []
 
-    def rec(prefix, rest):
+    listings = {}
+
+    def entries(d):
+        if d not in listings:
+            try:
+                listings[d] = os.listdir(d)
+            except OSError:
+                listings[d] = []
+        return listings[d]
+
+    matches = []
+    stack = [("/", "", name[1:])]  # (confirmed dir, partial component, rest of name)
+    while stack:
+        dirpath, partial, rest = stack.pop()
         i = rest.find("-")
         if i < 0:
-            full = prefix + rest
+            full = os.path.join(dirpath, partial + rest)
             if os.path.isdir(full):
                 matches.append(full)
-            return
-        comp, tail = prefix + rest[:i], rest[i + 1 :]
-        if os.path.isdir(comp):
-            rec(comp + "/", tail)
-        rec(comp + ".", tail)
-        rec(comp + "-", tail)
-
-    if name.startswith("-"):
-        rec("/", name[1:])
+            continue
+        comp, tail = partial + rest[:i], rest[i + 1 :]
+        # '/' branch: comp is a complete path component
+        if comp in entries(dirpath) and os.path.isdir(os.path.join(dirpath, comp)):
+            stack.append((os.path.join(dirpath, comp), "", tail))
+        # '.'/'-' branches: the component continues — only viable if some real entry
+        # starts with it
+        for ch in (".", "-"):
+            nxt = comp + ch
+            if any(e.startswith(nxt) for e in entries(dirpath)):
+                stack.append((dirpath, nxt, tail))
     return [m for m in matches if m.replace("/", "-").replace(".", "-") == name]
 
 
@@ -121,10 +140,12 @@ class ClaudeMemorySource:
 
     def describe_selection(self, include_all=False):
         files = self._files()
-        counts, unresolved = {}, set()
+        counts, decodable, unresolved = {}, {}, set()
         for f in files:
             proj_name = os.path.basename(os.path.dirname(os.path.dirname(f)))
-            if not decode_project_dir(proj_name):
+            if proj_name not in decodable:  # decode once per project, not per file
+                decodable[proj_name] = bool(decode_project_dir(proj_name))
+            if not decodable[proj_name]:
                 unresolved.add(proj_name)
             meta, _ = _parse_memory(open(f, encoding="utf-8", errors="replace").read())
             t = meta.get("type") or "(untyped)"
@@ -136,6 +157,7 @@ class ClaudeMemorySource:
         if unresolved:
             lines.append(
                 f"projects whose path no longer exists: {len(unresolved)} — their munged "
-                "names can't resolve a repo; recover with --map <munged-name>=owner/repo"
+                "names can't resolve a repo; recover with --map=<munged-name>=owner/repo "
+                "(the leading '-' requires the '=' form)"
             )
         return lines

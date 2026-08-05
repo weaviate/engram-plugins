@@ -7,8 +7,8 @@ client covers execution. The SDK is assumed present — run under the plugin ven
 import json
 import os
 import sqlite3
-import subprocess
 import tempfile
+import time
 import unittest
 import unittest.mock
 from types import SimpleNamespace
@@ -167,6 +167,13 @@ class ClaudeMemoryAdapterTest(unittest.TestCase):
     def test_decode_project_dir_roundtrip(self):
         munged = self.proj.replace("/", "-").replace(".", "-")
         self.assertIn(self.proj, decode_project_dir(munged))
+
+    def test_decode_deep_kebab_name_stays_fast(self):
+        # regression guard: the unpruned Θ(2ⁿ) search hung on ~25 dashes
+        name = "-Users-nobody-" + "-".join(["word"] * 40)
+        start = time.time()
+        self.assertEqual(decode_project_dir(name), [])
+        self.assertLess(time.time() - start, 2.0)
 
     def test_records_skip_index_and_decode_project(self):
         recs = {os.path.basename(r.uid.split("@")[0]): r for r in self.source.records()}
