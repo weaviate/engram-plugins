@@ -1,9 +1,9 @@
 """CLI: python -m core.migrate [flags]. Dry-run by default — --execute writes.
 
-Run via bin/engram-migrate (or the /engram:migrate command), which sets up the plugin venv
-and data dir. Dry-run needs neither credentials nor the SDK (it may still fetch the group
-schema for validation when no cache exists), so the migration plan can be inspected before
-any memory content leaves the machine.
+Run via bin/engram-migrate (the migrate-memories skill's scripts/migrate.sh delegates
+there too), which sets up the plugin venv and data dir. Dry-run needs neither credentials
+nor the SDK (it may still fetch the group schema for validation when no cache exists), so
+the migration plan can be inspected before any memory content leaves the machine.
 
 Exit codes: 0 done, 1 failed batches, 2 usage error (argparse), 3 incomplete — batches
 still pending, re-run to continue/reconcile."""
