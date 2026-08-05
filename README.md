@@ -111,6 +111,46 @@ With the default Engram project (quickstart) configuration, properties are infer
 
 and search is narrowed to the `repo_name` property. You can still use `.engram.json` to change this inferred behaviour.
 
+## Migrating from another memory system
+
+If you used another local memory system before Engram, import its memories. Inside Claude
+Code run `/engram:migrate`, or from a shell:
+
+```bash
+engram-migrate            # dry-run: report of what would be migrated (default)
+engram-migrate --execute  # migrate — resumable, safe to interrupt and re-run
+```
+
+Supported sources: **claude-mem** (default). The importer is strictly read-only on the
+source store and idempotent — a checkpoint in `~/.engram/migrate/` records committed items,
+so re-runs only send what's missing. Memories are imported through Engram's pre-extracted
+pipeline (no LLM re-extraction) with the original date prefixed to each memory.
+
+Useful flags:
+
+- `--all` — include low-signal record types (transient per-session observations), excluded
+  by default to keep recall sharp.
+- `--map NAME=owner/repo` — map a source project whose repo can't be inferred from a git
+  remote (unmapped projects are skipped and reported, never mis-filed).
+- `--project NAME` — migrate a single project; `--limit N` — smoke-test with a few items.
+- `--topic-map kind=Topic` — for custom Engram groups; the mapping is validated against
+  your group's topics before anything is sent.
+- `--property KEY=VALUE` — extra scope property for every batch. Required scope properties
+  are checked up front; `session_id` (meaningless for migrated data) is auto-filled with a
+  `migration:<source>` marker when your group requires it.
+- `--input conversation` — ingest through Engram's extraction pipeline instead of
+  pre-extracted storage: notes are grouped per repo and day into conversations whose
+  `created_at` tells the extractor when the data is from, so memory content carries real
+  dates natively. Slower (LLM extraction, strictly chronological), and the extractor
+  routes topics itself. Note: the `created_at` shown by search is always the ingestion
+  time — Weaviate does not allow overriding it — in either mode.
+- `--rollback` — delete every memory the migration created and reset the checkpoint.
+  Exact by construction: it deletes via the server's per-run commit manifests, so
+  memories stored organically by the plugin hooks are untouchable.
+
+To add a new source system, implement one adapter module in `plugin/core/migrate/`
+(see the package docstring for the small adapter contract) and register it in `sources()`.
+
 ## Environment variables
 
 | Variable          | Purpose                                                       |
