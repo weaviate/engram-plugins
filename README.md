@@ -125,10 +125,11 @@ engram-migrate --execute  # migrate — resumable, safe to interrupt and re-run
 
 Supported sources (`engram-migrate --detect` shows which exist on your machine):
 
-- **claude-mem** (default) — its SQLite observation store.
-- **claude-memory** — Claude Code's own local file memories
+- **claude-memory** (default) — Claude Code's own local file memories
   (`~/.claude/projects/*/memory/*.md`), siloed per project until migrated; editing a fact
   file re-imports it.
+- **claude-mem** (`--source claude-mem`) — the claude-mem plugin's SQLite observation
+  store.
 
 The importer is strictly read-only on the source store and idempotent — a per-source
 checkpoint in `~/.engram/migrate/` records committed items, so re-runs only send what's

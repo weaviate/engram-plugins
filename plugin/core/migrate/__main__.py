@@ -186,7 +186,9 @@ def main():
                     "Memories go through Engram's extraction pipeline, which classifies "
                     "them into your group's topics itself.",
     )
-    ap.add_argument("--source", default="claude-mem", choices=sorted(sources()))
+    # claude-memory is the default: every Claude Code install has the built-in local
+    # memory system, while claude-mem is an optional third-party plugin
+    ap.add_argument("--source", default="claude-memory", choices=sorted(sources()))
     ap.add_argument("--db", help="override the source's default store location")
     ap.add_argument("--project", action="append", help="migrate only this source project (repeatable)")
     ap.add_argument("--map", action="append", metavar="NAME=owner/repo",
