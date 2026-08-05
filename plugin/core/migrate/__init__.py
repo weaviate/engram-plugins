@@ -32,6 +32,9 @@ class Record:
 
 def sources():
     """Registry of source adapters, keyed by --source name."""
-    from . import claude_mem
+    from . import claude_mem, claude_memory
 
-    return {claude_mem.ClaudeMemSource.name: claude_mem.ClaudeMemSource}
+    return {
+        claude_mem.ClaudeMemSource.name: claude_mem.ClaudeMemSource,
+        claude_memory.ClaudeMemorySource.name: claude_memory.ClaudeMemorySource,
+    }

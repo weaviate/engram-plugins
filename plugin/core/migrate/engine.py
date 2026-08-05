@@ -27,8 +27,9 @@ from ..util import git_repo
 
 
 def project_dir_finder(explicit_dirs, registry_index, fallback_dirs):
-    """project name → existing directory, or None. Layered so no workspace layout is
-    assumed:
+    """project → existing directory, or None. An absolute-path project (a source that
+    knows the real directory, e.g. claude-memory's decoded project dirs) is checked
+    directly. Bare names are looked up in layers, so no workspace layout is assumed:
 
     1. explicit dirs (--repos-dir) — the user's stated locations always win;
     2. Claude Code's session registry index (claude_projects.index_by_basename) — the
@@ -56,6 +57,10 @@ def project_dir_finder(explicit_dirs, registry_index, fallback_dirs):
     def find(project):
         if project in cache:
             return cache[project]
+        if os.path.isabs(project):
+            found = project if os.path.isdir(project) else None
+            cache[project] = found
+            return found
         found = probe(explicit_dirs, project)
         if not found:
             candidates = registry_index.get(project) or []

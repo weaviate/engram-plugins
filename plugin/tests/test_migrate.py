@@ -13,8 +13,9 @@ import unittest
 import unittest.mock
 from types import SimpleNamespace
 
-from core.migrate import Record
+from core.migrate import Record, sources
 from core.migrate.claude_mem import ClaudeMemSource
+from core.migrate.claude_memory import ClaudeMemorySource, decode_project_dir
 from core.migrate.claude_projects import index_by_basename
 from core.migrate.engine import (
     execute,
@@ -130,6 +131,95 @@ def fake_props(mapping):
         if project in mapping
         else None
     )
+
+
+MEMORY_FILE = """---
+name: prefers-uv
+description: The user prefers uv for dependency management
+metadata:
+  type: user
+---
+
+Use uv, not pip, when adding dependencies.
+"""
+
+
+class ClaudeMemoryAdapterTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        # a real project dir whose munged name the adapter must decode back
+        self.proj = os.path.join(self.tmp.name, "my.repo")
+        os.makedirs(self.proj)
+        munged = self.proj.replace("/", "-").replace(".", "-")
+        self.memdir = os.path.join(self.tmp.name, "projects", munged, "memory")
+        os.makedirs(self.memdir)
+        with open(os.path.join(self.memdir, "MEMORY.md"), "w") as f:
+            f.write("- index entry, not a fact")
+        with open(os.path.join(self.memdir, "prefers-uv.md"), "w") as f:
+            f.write(MEMORY_FILE)
+        with open(os.path.join(self.memdir, "bare.md"), "w") as f:
+            f.write("A fact with no frontmatter at all.")
+        self.source = ClaudeMemorySource(os.path.join(self.tmp.name, "projects"))
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_decode_project_dir_roundtrip(self):
+        munged = self.proj.replace("/", "-").replace(".", "-")
+        self.assertIn(self.proj, decode_project_dir(munged))
+
+    def test_records_skip_index_and_decode_project(self):
+        recs = {os.path.basename(r.uid.split("@")[0]): r for r in self.source.records()}
+        self.assertEqual(set(recs), {"prefers-uv.md", "bare.md"})  # MEMORY.md skipped
+        pref = recs["prefers-uv.md"]
+        self.assertEqual(
+            pref.content,
+            "The user prefers uv for dependency management — "
+            "Use uv, not pip, when adding dependencies.",
+        )
+        self.assertEqual(pref.project, self.proj)  # munged name decoded to the real path
+        self.assertRegex(pref.created_at, r"^\d{4}-\d{2}-\d{2}T")  # file mtime
+        self.assertEqual(recs["bare.md"].content, "A fact with no frontmatter at all.")
+
+    def test_uid_changes_when_content_changes(self):
+        (before,) = [r.uid for r in self.source.records() if "prefers-uv" in r.uid]
+        with open(os.path.join(self.memdir, "prefers-uv.md"), "a") as f:
+            f.write("\nAlso: never use pipenv.")
+        (after,) = [r.uid for r in self.source.records() if "prefers-uv" in r.uid]
+        self.assertNotEqual(before, after)  # edited fact re-migrates under a fresh uid
+
+    def test_available_and_registry(self):
+        self.assertTrue(self.source.available())
+        self.assertIsNone(ClaudeMemorySource(os.path.join(self.tmp.name, "nope")).available())
+        self.assertIn("claude-memory", sources())
+
+    def test_describe_selection_counts_types(self):
+        text = "\n".join(self.source.describe_selection())
+        self.assertIn("user (1)", text)
+        self.assertIn("(untyped) (1)", text)
+
+
+class ProjectDirFinderTest(unittest.TestCase):
+    def test_absolute_project_checked_directly(self):
+        from core.migrate.engine import project_dir_finder
+
+        with tempfile.TemporaryDirectory() as tmp:
+            proj = os.path.join(tmp, "proj")
+            os.makedirs(proj)
+            find = project_dir_finder([])  # no repos dirs needed for absolute paths
+            self.assertEqual(find(proj), proj)
+            self.assertIsNone(find(os.path.join(tmp, "missing")))
+
+    def test_bare_name_probed_against_repos_dirs(self):
+        from core.migrate.engine import project_dir_finder
+
+        with tempfile.TemporaryDirectory() as tmp:
+            proj = os.path.join(tmp, "proj")
+            os.makedirs(proj)
+            find = project_dir_finder([tmp])
+            self.assertEqual(find("proj"), proj)
+            # the repos dir itself matches when its basename is the project name
+            self.assertEqual(project_dir_finder([proj])("proj"), proj)
 
 
 class EngineTest(unittest.TestCase):

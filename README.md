@@ -28,13 +28,6 @@ Inside Claude Code CLI session do:
 
 That's it. Memory starts working on your next prompt.
 
-## Commands
-
-- `/engram:import-memories` — one-shot import of Claude Code's local file-based memories
-  (`~/.claude/projects/*/memory/*.md`) into Engram. Each fact is tagged with the source
-  project's git origin repo (`repo_name`), so memories that were siloed per project become
-  recallable everywhere. Re-running only imports new or changed files.
-
 ## Identity
 
 When Engram project uses `user_id` to isolate memories, it ties it to:
@@ -130,17 +123,24 @@ engram-migrate            # dry-run: report of what would be migrated (default)
 engram-migrate --execute  # migrate — resumable, safe to interrupt and re-run
 ```
 
-Supported sources: **claude-mem** (default). The importer is strictly read-only on the
-source store and idempotent — a checkpoint in `~/.engram/migrate/` records committed items,
-so re-runs only send what's missing. Memories are grouped per repo and day into
-chronological conversations and imported through Engram's extraction pipeline, with each
-conversation's `created_at` telling the extractor when the data is from — so memory
-content carries real dates. Engram classifies each memory into your group's topics itself;
-the migration never picks a topic, so any topic setup works. Scope properties resolve per
-source project the same way the store hook resolves them — same configuration files
-(`~/.engram/config.json`, per-dir `.engram.json`), same source cascades — so migrated and
-realtime memories are scoped identically. Note: the `created_at` shown by search is always
-the ingestion time — Weaviate does not allow overriding it.
+Supported sources (`engram-migrate --detect` shows which exist on your machine):
+
+- **claude-mem** (default) — its SQLite observation store.
+- **claude-memory** — Claude Code's own local file memories
+  (`~/.claude/projects/*/memory/*.md`), siloed per project until migrated; editing a fact
+  file re-imports it.
+
+The importer is strictly read-only on the source store and idempotent — a per-source
+checkpoint in `~/.engram/migrate/` records committed items, so re-runs only send what's
+missing. Memories are grouped per repo and day into chronological conversations and
+imported through Engram's extraction pipeline, with each conversation's `created_at`
+telling the extractor when the data is from — so memory content carries real dates. Engram
+classifies each memory into your group's topics itself; the migration never picks a topic,
+so any topic setup works. Scope properties resolve per source project the same way the
+store hook resolves them — same configuration files (`~/.engram/config.json`, per-dir
+`.engram.json`), same source cascades — so migrated and realtime memories are scoped
+identically. Note: the `created_at` shown by search is always the ingestion time —
+Weaviate does not allow overriding it.
 
 Useful flags:
 

@@ -202,7 +202,15 @@ def main():
     ap.add_argument("--rollback", action="store_true",
                     help="delete every memory this migration created (via run manifests) "
                          "and reset the checkpoint")
+    ap.add_argument("--detect", action="store_true",
+                    help="list registered sources and whether their store is present, "
+                         "then exit")
     args = ap.parse_args()
+    if args.detect:
+        for name, cls in sorted(sources().items()):
+            found = cls().available()
+            print(f"{name}: {found or 'not found'}")
+        return 0
     if args.rollback and args.execute:
         sys.exit("--rollback and --execute are mutually exclusive")
 
