@@ -112,10 +112,11 @@ and search is narrowed to the `repo_name` property. You can still use `.engram.j
 
 ## Migrating from another memory system
 
-If you used another local memory system before Engram, import its memories. Inside Claude
-Code run `/engram:migrate`, or from a shell inside a Claude Code session (the plugin's
-`bin/` is on PATH there — in a plain terminal use the script's full path,
-`<plugin dir>/bin/engram-migrate`):
+If you used another local memory system before Engram, import its memories. Ask your
+assistant to "migrate my claude-mem memories to Engram" — the bundled `migrate-memories`
+skill guides it (dry-run, review, confirm, execute) and works on any harness that loads
+skills. Or run the CLI yourself (inside a Claude Code session the plugin's `bin/` is on
+PATH; elsewhere use the script's full path, `<plugin dir>/bin/engram-migrate`):
 
 ```bash
 engram-migrate            # dry-run: report of what would be migrated (default)
