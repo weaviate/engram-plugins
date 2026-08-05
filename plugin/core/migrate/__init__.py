@@ -2,13 +2,15 @@
 
 A source adapter turns a foreign store into a stream of Records speaking the tiny KINDS
 vocabulary below; the engine (core.migrate.engine) maps kinds to the Engram group's topics,
-batches per repo scope, and submits through the pre-extracted pipeline — the content was
-already LLM-summarized by the source system, so no re-extraction. Adding a new source is one
-adapter module plus a sources() entry; the engine never changes.
+batches per repo scope, and submits either through the pre-extracted pipeline (content was
+already LLM-summarized by the source — no re-extraction) or, with --input conversation,
+through the extraction pipeline with the records' original dates as context. Adding a new
+source is one adapter module plus a sources() entry; the engine never changes.
 
 An adapter is a class with:
     name                     registry key (the CLI --source value)
     __init__(path=None)      path overrides the source's default store location
+    db_path                  resolved store location (used in CLI error messages)
     available()              path/description of the detected install, or None
     records(include_all)     iterator of Record
     describe_selection(include_all)   optional: human lines for the dry-run report

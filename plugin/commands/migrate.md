@@ -5,10 +5,12 @@ description: Migrate memories from another local memory system (claude-mem) into
 Migrate the user's existing memories into Engram with the plugin's migration CLI. It is
 read-only on the source store and resumable (checkpoint in `~/.engram/migrate/`).
 
-1. Dry-run first (never skip this):
+1. Dry-run first (never skip this). If the user's arguments contain `--execute` or
+   `--rollback`, REMOVE them for this step — they are applied only after the user confirms
+   in step 3:
 
    ```bash
-   bash "${CLAUDE_PLUGIN_ROOT}/bin/engram-migrate" $ARGUMENTS
+   bash "${CLAUDE_PLUGIN_ROOT}/bin/engram-migrate" $ARGUMENTS   # minus --execute/--rollback
    ```
 
 2. Present the report to the user: how many memories per topic and repo, which projects

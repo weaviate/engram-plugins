@@ -38,8 +38,14 @@ def _obs_content(title, narrative, text, facts):
     body = (narrative or text or "").strip()
     if not body and facts:
         try:
-            body = "; ".join(str(f) for f in json.loads(facts))
+            parsed = json.loads(facts)
         except Exception:
+            parsed = None
+        # only a JSON array joins element-wise — a stray object or string would otherwise
+        # degrade into joined keys or characters
+        if isinstance(parsed, list):
+            body = "; ".join(str(f) for f in parsed)
+        else:
             body = str(facts).strip()
     parts = [p.strip() for p in (title or "", body) if p and p.strip()]
     return " — ".join(parts)
@@ -124,7 +130,14 @@ class ClaudeMemSource:
         """Dry-run report lines: what's included, what --all would add, unknown types."""
         con = self._connect()
         try:
-            counts = dict(con.execute("SELECT type, COUNT(*) FROM observations GROUP BY type"))
+            # NULL types can't be migrated (records() filters on type IN (...)) and would
+            # crash the sorted() below — drop them from the report rather than the CLI
+            counts = dict(
+                con.execute(
+                    "SELECT type, COUNT(*) FROM observations "
+                    "WHERE type IS NOT NULL GROUP BY type"
+                )
+            )
             (n_sum,) = con.execute("SELECT COUNT(*) FROM session_summaries").fetchone()
         finally:
             con.close()

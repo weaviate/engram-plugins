@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Migration CLI launcher. Unlike hooks, a CLI isn't handed CLAUDE_PLUGIN_ROOT/DATA by the
-# host, so this derives them: ROOT from this script's own location, DATA from the installed
-# cache/<marketplace>/<plugin>/<version> layout (matching the host's data/<plugin>-<marketplace>
-# convention). A dev checkout gets a fixed fallback — ensure_deps builds the venv there
-# idempotently. Host-provided env still wins, so hooks-style invocation stays authoritative.
+# host, so this derives them: ROOT always from this script's own location (a stale host
+# value pointing at another install would break with-venv.sh), DATA from the host env when
+# set, else from the installed cache/<marketplace>/<plugin>/<version> layout (matching the
+# host's data/<plugin>-<marketplace> convention). A dev checkout gets a fixed fallback —
+# ensure_deps builds the venv there idempotently.
 set -euo pipefail
 SELF="$(cd "$(dirname "$0")" && pwd -P)"
 ROOT="$(dirname "$SELF")"
