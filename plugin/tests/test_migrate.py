@@ -115,6 +115,17 @@ class ClaudeMemAdapterTest(unittest.TestCase):
             con.execute("DELETE FROM observations")
         con.close()
 
+    def test_readonly_survives_uri_reserved_path_chars(self):
+        # a '?' in the filename must not smuggle URI params past mode=ro
+        tricky = os.path.join(self.tmp.name, "mem?mode=rw#x.db")
+        make_db(tricky)
+        source = ClaudeMemSource(tricky)
+        self.assertTrue(any(source.records()))
+        con = source._connect()
+        with self.assertRaises(sqlite3.OperationalError):
+            con.execute("DELETE FROM observations")
+        con.close()
+
 
 def fake_resolver(mapping):
     return lambda project: mapping.get(project)
@@ -166,6 +177,18 @@ class EngineTest(unittest.TestCase):
         # raw content, no [date] prefix — created_at carries the date in this mode
         self.assertEqual(planned["batches"][1][1][0], ("a2", "2026-05-06T05:00:00Z", "two"))
         self.assertEqual(planned["skipped"], {"unmapped": 1})
+
+    def test_plan_conversations_excludes_undated(self):
+        recs = [
+            Record("a1", "task", "dated", "2026-05-06T10:00:00Z", "alpha"),
+            Record("a2", "task", "no date", None, "alpha"),
+            Record("a3", "task", "garbage date", "not-a-ts", "alpha"),
+        ]
+        planned = plan_conversations(recs, fake_resolver({"alpha": "org/alpha"}))
+        self.assertEqual(planned["items"], 1)
+        self.assertEqual(planned["undated"], 2)
+        self.assertEqual(planned["project_counts"], {"alpha": 1})
+        self.assertIn("undated records excluded: 2", render_report(planned, [], "h"))
 
     def test_rollback_deletes_via_run_manifests(self):
         manifests = {

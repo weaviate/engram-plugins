@@ -7,6 +7,7 @@ two LLM-summarized tables are read: `observations` and `session_summaries`. Raw
 import json
 import os
 import sqlite3
+from urllib.parse import quote
 
 from . import Record
 
@@ -73,8 +74,10 @@ class ClaudeMemSource:
         return self.db_path if os.path.exists(self.db_path) else None
 
     def _connect(self):
-        # mode=ro guarantees read-only at the sqlite level, not just by convention
-        return sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True)
+        # mode=ro guarantees read-only at the sqlite level, not just by convention.
+        # Percent-encoding keeps URI-reserved characters in the path (?, #, %) from being
+        # parsed as query/fragment — a crafted "...db?mode=rw" must not defeat ro.
+        return sqlite3.connect("file:" + quote(self.db_path, safe="/") + "?mode=ro", uri=True)
 
     def _types(self, include_all):
         return list(KIND_BY_TYPE) if include_all else list(CURATED_TYPES)
