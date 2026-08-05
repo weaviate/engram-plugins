@@ -6,9 +6,8 @@ import os
 import subprocess
 import urllib.request
 
-from engram import EngramClient
-
 from .client_origin import client_origin_header
+
 
 DEFAULT_BASE = "https://api.engram.weaviate.io"
 
@@ -90,6 +89,10 @@ def get_user_id():
 
 
 def get_client():
+    # SDK import stays local: everything else in this module (key/identity resolution, the
+    # REST helper) is stdlib-only and must keep working where the SDK isn't installed.
+    from engram import EngramClient
+
     api_key = engram_api_key()
     if not api_key:
         return None
