@@ -186,10 +186,12 @@ class EngineTest(unittest.TestCase):
         client = SimpleNamespace(
             runs=SimpleNamespace(
                 get=lambda rid: SimpleNamespace(
+                    status="completed",
+                    error=None,
                     committed_operations=SimpleNamespace(
                         created=[SimpleNamespace(memory_id=m) for m in manifests[rid]],
                         updated=[], deleted=[],
-                    )
+                    ),
                 )
             ),
             memories=SimpleNamespace(delete=delete),
