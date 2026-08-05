@@ -83,7 +83,7 @@ def _bucket(records, resolve, skip_uids):
     return kept, mapping, skipped, project_counts, already
 
 
-def _result(batches, mapping, skipped, project_counts, by_topic, already):
+def _result(batches, mapping, skipped, project_counts, by_topic, already, undated=0):
     return {
         "batches": batches,
         "mapping": mapping,
@@ -92,6 +92,7 @@ def _result(batches, mapping, skipped, project_counts, by_topic, already):
         "by_topic": by_topic,
         "items": sum(len(b) for _, b in batches),
         "already": already,
+        "undated": undated,
         "sample": batches[0][1][0] if batches else None,
     }
 
@@ -127,18 +128,27 @@ def plan_conversations(records, resolve, skip_uids=frozenset()):
     day granularity (within one day, repos submit in name order; items inside a group are
     time-sorted): the API contract requires importing in chronological order, so execution
     is strictly serial and aborts (resumable) rather than skip ahead past an unfinished or
-    failed run."""
+    failed run. Records without a usable date are excluded and counted — they cannot be
+    placed in the chronological stream (pre-extracted mode carries them fine)."""
     kept, mapping, skipped, project_counts, already = _bucket(records, resolve, skip_uids)
     groups = {}
+    undated = 0
     for repo, rec in kept:
-        day = (rec.created_at or "")[:10] or "0000-00-00"
-        groups.setdefault((day, repo), []).append((rec.uid, rec.created_at or "", rec.content))
+        day = (rec.created_at or "")[:10]
+        if len(day) != 10 or not day[:4].isdigit():
+            undated += 1
+            project = rec.project or "(none)"
+            project_counts[project] -= 1
+            if not project_counts[project]:
+                project_counts.pop(project)
+            continue
+        groups.setdefault((day, repo), []).append((rec.uid, rec.created_at, rec.content))
     batches = []
     for day, repo in sorted(groups):
         items = sorted(groups[(day, repo)], key=lambda it: it[1])
         for i in range(0, len(items), MAX_CONVERSATION_MESSAGES):
             batches.append((repo, items[i : i + MAX_CONVERSATION_MESSAGES]))
-    return _result(batches, mapping, skipped, project_counts, {}, already)
+    return _result(batches, mapping, skipped, project_counts, {}, already, undated=undated)
 
 
 def render_report(planned, source_lines, header):
@@ -170,6 +180,11 @@ def render_report(planned, source_lines, header):
         # pending (in-flight, unconfirmed) uids are counted here too — the checkpoint
         # reserves them; reconcile on --execute settles which ones actually committed
         lines.append(f"  recorded in checkpoint (migrated or in flight): {planned['already']}")
+    if planned.get("undated"):
+        lines.append(
+            f"  undated records excluded: {planned['undated']} — conversation mode needs "
+            "created_at; migrate them with --input pre-extracted"
+        )
     if planned["sample"]:
         uid, tag, content = planned["sample"]  # tag: topic (pre-extracted) or timestamp
         preview = content if len(content) <= 400 else content[:400] + "…"
