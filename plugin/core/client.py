@@ -8,6 +8,8 @@ import urllib.request
 
 from engram import EngramClient
 
+from .client_origin import client_origin_header
+
 DEFAULT_BASE = "https://api.engram.weaviate.io"
 
 _PROFILES = (
@@ -91,7 +93,9 @@ def get_client():
     api_key = engram_api_key()
     if not api_key:
         return None
-    return EngramClient(api_key=api_key, base_url=engram_base_url())
+    return EngramClient(
+        api_key=api_key, base_url=engram_base_url(), headers=client_origin_header()
+    )
 
 
 def engram_warning():
@@ -110,7 +114,11 @@ def engram_get(path):
     whole instead of continuing with a half-resolved scope."""
     base = engram_base_url().rstrip("/")
     req = urllib.request.Request(
-        base + path, headers={"Authorization": f"Bearer {engram_api_key()}"}
+        base + path,
+        headers={
+            "Authorization": f"Bearer {engram_api_key()}",
+            **client_origin_header(),
+        },
     )
     with urllib.request.urlopen(req, timeout=5) as resp:
         return json.load(resp)
