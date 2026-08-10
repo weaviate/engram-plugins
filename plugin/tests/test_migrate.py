@@ -16,9 +16,7 @@ from types import SimpleNamespace
 from core.migrate import Record
 from core.migrate.claude_mem import ClaudeMemSource
 from core.migrate.engine import (
-    KIND_TO_TOPIC,
     load_checkpoint,
-    plan,
     plan_conversations,
     reconcile_pending,
     render_report,
@@ -85,13 +83,10 @@ class ClaudeMemAdapterTest(unittest.TestCase):
         self.assertEqual(
             set(recs), {"obs:1", "obs:2", "obs:3", "sum:10"}
         )  # no discovery, no unknown type
-        self.assertEqual(recs["obs:1"].kind, "architecture")
         self.assertEqual(recs["obs:1"].content, "Chose X — Because Y.")
-        self.assertEqual(recs["obs:2"].kind, "task")
         self.assertEqual(recs["obs:2"].project, "alpha")  # merged_into_project wins
         self.assertEqual(recs["obs:2"].content, "Fixed Z — Legacy body")
         self.assertEqual(recs["obs:3"].content, "Added W — f1; f2")  # facts fallback
-        self.assertEqual(recs["sum:10"].kind, "task")
         # empty/NULL summary fields are dropped, populated ones labeled
         self.assertEqual(
             recs["sum:10"].content,
@@ -134,55 +129,47 @@ def fake_resolver(mapping):
 class EngineTest(unittest.TestCase):
     def recs(self):
         return [
-            Record("a1", "architecture", "one", "2026-05-06T05:25:22Z", "alpha"),
-            Record("a2", "task", "two", None, "alpha"),
-            Record("b1", "task", "three", "2026-06-01T00:00:00Z", "beta"),
-            Record("x1", "task", "lost", "2026-06-01T00:00:00Z", "unmapped"),
+            Record("a1", "one", "2026-05-06T10:00:00Z", "alpha"),
+            Record("a2", "two", "2026-05-06T05:00:00Z", "alpha"),
+            Record("b1", "three", "2026-04-01T00:00:00Z", "beta"),
+            Record("x1", "lost", "2026-06-01T00:00:00Z", "unmapped"),
         ]
 
-    def test_plan_groups_batches_and_skips(self):
+    def test_plan_orders_chronologically_and_skips_unmapped(self):
         resolve = fake_resolver({"alpha": "org/alpha", "beta": "org/beta"})
-        planned = plan(self.recs(), resolve, KIND_TO_TOPIC, batch_size=1)
-        self.assertEqual(planned["items"], 3)
+        planned = plan_conversations(self.recs(), resolve)
+        # earliest day first; within a day, items sorted by timestamp
+        self.assertEqual(
+            [(label, [u for u, _, _ in items]) for label, items in planned["batches"]],
+            [("org/beta", ["b1"]), ("org/alpha", ["a2", "a1"])],
+        )
+        self.assertEqual(planned["batches"][1][1][0], ("a2", "2026-05-06T05:00:00Z", "two"))
         self.assertEqual(planned["skipped"], {"unmapped": 1})
-        self.assertEqual([r for r, _ in planned["batches"]],
-                         ["org/alpha", "org/alpha", "org/beta"])  # batch_size=1 splits
-        by_uid = {u: (t, c) for _, items in planned["batches"] for u, t, c in items}
-        self.assertEqual(by_uid["a1"], ("DomainAndArchitecture", "[2026-05-06] one"))
-        self.assertEqual(by_uid["a2"], ("TaskStatus", "two"))  # no date → no prefix
         report = render_report(planned, ["src line"], "hdr")
         self.assertIn("unmapped", report)
         self.assertIn("org/alpha", report)
 
+    def test_plan_without_repo_scoping_keeps_unmapped(self):
+        # the group has no repo_name property: nothing can be mis-filed, so unresolvable
+        # projects migrate too, labeled by their project name
+        resolve = fake_resolver({"alpha": "org/alpha", "beta": "org/beta"})
+        planned = plan_conversations(self.recs(), resolve, require_repo=False)
+        self.assertEqual(planned["items"], 4)
+        self.assertEqual(planned["skipped"], {})
+        self.assertIn(("unmapped", [("x1", "2026-06-01T00:00:00Z", "lost")]),
+                      planned["batches"])
+
     def test_plan_skip_uids(self):
         resolve = fake_resolver({"alpha": "org/alpha", "beta": "org/beta"})
-        planned = plan(self.recs(), resolve, KIND_TO_TOPIC, 50, skip_uids={"a1", "b1"})
+        planned = plan_conversations(self.recs(), resolve, skip_uids={"a1", "b1"})
         self.assertEqual(planned["items"], 1)
         self.assertEqual(planned["already"], 2)
 
-    def test_plan_conversations_orders_chronologically(self):
+    def test_plan_excludes_undated(self):
         recs = [
-            Record("a1", "architecture", "one", "2026-05-06T10:00:00Z", "alpha"),
-            Record("a2", "task", "two", "2026-05-06T05:00:00Z", "alpha"),
-            Record("b1", "task", "three", "2026-04-01T00:00:00Z", "beta"),
-            Record("x1", "task", "lost", "2026-06-01T00:00:00Z", "unmapped"),
-        ]
-        resolve = fake_resolver({"alpha": "org/alpha", "beta": "org/beta"})
-        planned = plan_conversations(recs, resolve)
-        # earliest day first; within a day, items sorted by timestamp
-        self.assertEqual(
-            [(repo, [u for u, _, _ in items]) for repo, items in planned["batches"]],
-            [("org/beta", ["b1"]), ("org/alpha", ["a2", "a1"])],
-        )
-        # raw content, no [date] prefix — created_at carries the date in this mode
-        self.assertEqual(planned["batches"][1][1][0], ("a2", "2026-05-06T05:00:00Z", "two"))
-        self.assertEqual(planned["skipped"], {"unmapped": 1})
-
-    def test_plan_conversations_excludes_undated(self):
-        recs = [
-            Record("a1", "task", "dated", "2026-05-06T10:00:00Z", "alpha"),
-            Record("a2", "task", "no date", None, "alpha"),
-            Record("a3", "task", "garbage date", "not-a-ts", "alpha"),
+            Record("a1", "dated", "2026-05-06T10:00:00Z", "alpha"),
+            Record("a2", "no date", None, "alpha"),
+            Record("a3", "garbage date", "not-a-ts", "alpha"),
         ]
         planned = plan_conversations(recs, fake_resolver({"alpha": "org/alpha"}))
         self.assertEqual(planned["items"], 1)
@@ -247,16 +234,12 @@ class EngineTest(unittest.TestCase):
 
 @unittest.skipUnless(importlib.util.find_spec("engram"), "Engram SDK not installed")
 class ExecuteTest(unittest.TestCase):
-    def test_execute_commits_and_checkpoints(self):
-        from core.migrate.engine import execute
-
-        calls = []
-
+    def _client(self, calls):
         def add(inp, user_id=None, properties=None):
-            calls.append((len(inp.items), user_id, properties))
+            calls.append((len(inp.messages) - 1, user_id, properties))  # minus system msg
             return SimpleNamespace(run_id=f"r{len(calls)}")
 
-        client = SimpleNamespace(
+        return SimpleNamespace(
             memories=SimpleNamespace(add=add),
             runs=SimpleNamespace(
                 wait=lambda rid, timeout, interval: SimpleNamespace(
@@ -264,16 +247,25 @@ class ExecuteTest(unittest.TestCase):
                 )
             ),
         )
-        planned = {
+
+    def _planned(self):
+        return {
             "batches": [
-                ("org/alpha", [("a1", "TaskStatus", "one"), ("a2", "TaskStatus", "two")]),
-                ("org/beta", [("b1", "Processes", "three")]),
+                ("org/alpha", [("a1", "2026-05-06T05:00:00Z", "one"),
+                               ("a2", "2026-05-06T10:00:00Z", "two")]),
+                ("org/beta", [("b1", "2026-06-01T00:00:00Z", "three")]),
             ]
         }
+
+    def test_execute_commits_and_checkpoints(self):
+        from core.migrate.engine import execute
+
+        calls = []
         with tempfile.TemporaryDirectory() as tmp:
             cp_path = os.path.join(tmp, "cp.json")
             cp = {"done": {}, "pending": {}}
-            result = execute(planned, client, "u@x", cp, cp_path, log=lambda *_: None,
+            result = execute(self._planned(), self._client(calls), "u@x", cp, cp_path,
+                             log=lambda *_: None,
                              extra_properties={"session_id": "migration:claude-mem"})
             self.assertEqual(result, {"committed": 2, "failed": [], "pending": 0})
             self.assertEqual(
@@ -283,6 +275,17 @@ class ExecuteTest(unittest.TestCase):
             )
             self.assertEqual(load_checkpoint(cp_path)["done"],
                              {"a1": "r1", "a2": "r1", "b1": "r2"})
+
+    def test_execute_without_repo_scoping_sends_no_properties(self):
+        from core.migrate.engine import execute
+
+        calls = []
+        with tempfile.TemporaryDirectory() as tmp:
+            cp = {"done": {}, "pending": {}}
+            execute(self._planned(), self._client(calls), "u@x", cp,
+                    os.path.join(tmp, "cp.json"), log=lambda *_: None, attach_repo=False)
+        # the group configures no properties: none are sent, not even repo_name
+        self.assertEqual([props for _, _, props in calls], [None, None])
 
     def test_execute_conversation_builds_input_and_preserves_order(self):
         from engram import ConversationInput
@@ -314,7 +317,7 @@ class ExecuteTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             cp = {"done": {}, "pending": {}}
             result = execute(planned, client, "u@x", cp, os.path.join(tmp, "cp.json"),
-                             wait_timeout=1, log=lambda *_: None, mode="conversation")
+                             wait_timeout=1, log=lambda *_: None)
         self.assertEqual(len(submitted), 1)  # aborted after the unfinished first run
         self.assertEqual(result["pending"], 1)
         inp = submitted[0]

@@ -125,8 +125,13 @@ engram-migrate --execute  # migrate — resumable, safe to interrupt and re-run
 
 Supported sources: **claude-mem** (default). The importer is strictly read-only on the
 source store and idempotent — a checkpoint in `~/.engram/migrate/` records committed items,
-so re-runs only send what's missing. Memories are imported through Engram's pre-extracted
-pipeline (no LLM re-extraction) with the original date prefixed to each memory.
+so re-runs only send what's missing. Memories are grouped per repo and day into
+chronological conversations and imported through Engram's extraction pipeline, with each
+conversation's `created_at` telling the extractor when the data is from — so memory
+content carries real dates. Engram classifies each memory into your group's topics itself;
+the migration never picks a topic, so any topic setup works. `repo_name` is attached only
+when your group configures that property. Note: the `created_at` shown by search is always
+the ingestion time — Weaviate does not allow overriding it.
 
 Useful flags:
 
@@ -135,17 +140,9 @@ Useful flags:
 - `--map NAME=owner/repo` — map a source project whose repo can't be inferred from a git
   remote (unmapped projects are skipped and reported, never mis-filed).
 - `--project NAME` — migrate a single project; `--limit N` — smoke-test with a few items.
-- `--topic-map kind=Topic` — for custom Engram groups; the mapping is validated against
-  your group's topics before anything is sent.
 - `--property KEY=VALUE` — extra scope property for every batch. Required scope properties
   are checked up front; `session_id` (meaningless for migrated data) is auto-filled with a
   `migration:<source>` marker when your group requires it.
-- `--input conversation` — ingest through Engram's extraction pipeline instead of
-  pre-extracted storage: notes are grouped per repo and day into conversations whose
-  `created_at` tells the extractor when the data is from, so memory content carries real
-  dates natively. Slower (LLM extraction, strictly chronological), and the extractor
-  routes topics itself. Note: the `created_at` shown by search is always the ingestion
-  time — Weaviate does not allow overriding it — in either mode.
 - `--rollback` — delete every memory the migration created and reset the checkpoint.
   Exact by construction: it deletes via the server's per-run commit manifests, so
   memories stored organically by the plugin hooks are untouchable.

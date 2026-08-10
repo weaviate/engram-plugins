@@ -13,24 +13,12 @@ from . import Record
 
 DEFAULT_DB = "~/.claude-mem/claude-mem.db"
 
-# claude-mem observation `type` → our kind. Everything describing the codebase and its
-# decisions maps to `architecture`; work items map to `task`. A type missing here (from a
-# newer claude-mem) is skipped and reported by describe_selection rather than mis-filed.
-KIND_BY_TYPE = {
-    "discovery": "architecture",
-    "change": "architecture",
-    "refactor": "architecture",
-    "decision": "architecture",
-    "security_alert": "architecture",
-    "security_note": "architecture",
-    "bugfix": "task",
-    "feature": "task",
-}
-
 # Migrated by default. discovery/change/refactor are transient per-session observations —
 # the bulk of a store (>80% here) with low recall value — so they ride behind --all instead
-# of polluting recall out of the box.
+# of polluting recall out of the box. A type outside ALL_TYPES (from a newer claude-mem) is
+# skipped and reported by describe_selection rather than migrated blind.
 CURATED_TYPES = ("decision", "bugfix", "feature", "security_alert", "security_note")
+ALL_TYPES = CURATED_TYPES + ("discovery", "change", "refactor")
 
 
 def _obs_content(title, narrative, text, facts):
@@ -80,7 +68,7 @@ class ClaudeMemSource:
         return sqlite3.connect("file:" + quote(self.db_path, safe="/") + "?mode=ro", uri=True)
 
     def _types(self, include_all):
-        return list(KIND_BY_TYPE) if include_all else list(CURATED_TYPES)
+        return list(ALL_TYPES) if include_all else list(CURATED_TYPES)
 
     def records(self, include_all=False):
         con = self._connect()
@@ -94,17 +82,16 @@ class ClaudeMemSource:
         types = self._types(include_all)
         # merged_into_project is claude-mem's own project rename/merge — honor it
         q = (
-            "SELECT id, type, title, narrative, text, facts, created_at, "
+            "SELECT id, title, narrative, text, facts, created_at, "
             "COALESCE(merged_into_project, project) FROM observations "
             f"WHERE type IN ({','.join('?' * len(types))}) ORDER BY id"
         )
-        for oid, typ, title, narrative, text, facts, created, project in con.execute(q, types):
+        for oid, title, narrative, text, facts, created, project in con.execute(q, types):
             content = _obs_content(title, narrative, text, facts)
             if not content:
                 continue
             yield Record(
                 uid=f"obs:{oid}",
-                kind=KIND_BY_TYPE[typ],
                 content=content,
                 created_at=created,
                 project=project,
@@ -119,11 +106,8 @@ class ClaudeMemSource:
             content = _summary_content(row[1:6])
             if not content:
                 continue
-            # summaries are progress/outcome reports → task (see engine.KIND_TO_TOPIC for
-            # why they don't go to SessionHistory)
             yield Record(
                 uid=f"sum:{row[0]}",
-                kind="task",
                 content=content,
                 created_at=row[6],
                 project=row[7],
@@ -149,8 +133,8 @@ class ClaudeMemSource:
             return ", ".join(f"{t} ({counts[t]})" for t in sorted(names)) or "none"
 
         chosen = set(self._types(include_all))
-        excluded = [t for t in counts if t in KIND_BY_TYPE and t not in chosen]
-        unknown = [t for t in counts if t not in KIND_BY_TYPE]
+        excluded = [t for t in counts if t in ALL_TYPES and t not in chosen]
+        unknown = [t for t in counts if t not in ALL_TYPES]
         lines = [
             f"observations included: {fmt(t for t in counts if t in chosen)}",
             f"session summaries included: {n_sum}",

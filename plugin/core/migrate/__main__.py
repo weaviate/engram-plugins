@@ -2,8 +2,9 @@
 
 Run via bin/engram-migrate (the migrate-memories skill's scripts/migrate.sh delegates
 there too), which sets up the plugin venv and data dir. Dry-run needs neither credentials
-nor the SDK (it may still fetch the group schema for validation when no cache exists), so
-the migration plan can be inspected before any memory content leaves the machine.
+nor the SDK (it may still fetch the group schema to learn the property setup when no cache
+exists), so the migration plan can be inspected before any memory content leaves the
+machine.
 
 Exit codes: 0 done, 1 failed batches, 2 usage error (argparse), 3 incomplete — batches
 still pending, re-run to continue/reconcile."""
@@ -12,13 +13,11 @@ import argparse
 import os
 import sys
 
-from . import KINDS, sources
+from . import sources
 from .engine import (
-    KIND_TO_TOPIC,
     checkpoint_path,
     execute,
     load_checkpoint,
-    plan,
     plan_conversations,
     reconcile_pending,
     render_report,
@@ -27,9 +26,9 @@ from .engine import (
     save_checkpoint,
 )
 
-DEFAULT_BATCH_SIZE = 50
-# extraction pipelines (conversation) take much longer than pre-extracted storage
-WAIT_PRE_EXTRACTED, WAIT_CONVERSATION = 180, 600
+# each conversation waits on Engram's extraction pipeline, which takes far longer than a
+# plain write
+WAIT_PIPELINE = 600
 
 
 def _positive(value):
@@ -54,9 +53,11 @@ def _parse_kv(pairs, flag):
 
 
 def _schema(execute_mode):
-    """The cached/fetched group schema. Dry-run degrades to a warning without one; --execute
-    refuses to run — sending batches with unvalidated topics/scope would just fail one by
-    one server-side."""
+    """The cached/fetched group schema — needed only to learn which scope properties the
+    group configures (topics are Engram's own concern: extraction classifies memories, so
+    no topic validation happens here). Dry-run degrades to a warning without a schema;
+    --execute refuses to run — sending batches with the wrong property setup would just
+    fail one by one server-side."""
     try:
         from ..scope import scope_schema
 
@@ -65,45 +66,23 @@ def _schema(execute_mode):
         if execute_mode:
             sys.exit(
                 f"cannot read the group schema ({e}) — refusing to migrate without "
-                "validating topics and required scope properties; retry when the API is "
+                "knowing the group's required scope properties; retry when the API is "
                 "reachable"
             )
-        print(f"note: couldn't read the group schema ({e}); topics and scope not validated")
+        print(f"note: couldn't read the group schema ({e}); scope properties not validated")
         return None
-
-
-def _topic_map(overrides, schema):
-    """Default mapping + --topic-map overrides, validated against the live group schema so a
-    typo'd or missing topic fails before any batch is sent."""
-    unknown = sorted(set(overrides) - set(KINDS))
-    if unknown:
-        sys.exit(f"--topic-map kinds {unknown} not in {list(KINDS)}")
-    mapping = {**KIND_TO_TOPIC, **overrides}
-    topics = [
-        t.get("topic_name")
-        for t in (schema or {}).get("raw", {}).get("topics", [])
-        if t.get("topic_name")
-    ]
-    if schema is not None and not topics:
-        print("note: the group schema lists no topics; mapping not validated")
-    missing = sorted(set(mapping.values()) - set(topics))
-    if topics and missing:
-        sys.exit(
-            f"topics {missing} don't exist in your Engram group (available: {topics}). "
-            "Remap with --topic-map kind=Topic."
-        )
-    return mapping
 
 
 def _batch_properties(schema, source_name, overrides):
     """Scope properties attached to every batch besides repo_name — the server rejects a
     write missing any property the group requires. session_id is auto-filled with a
-    migration marker: a migrated memory has no live session, and recall doesn't filter on
-    it. Any other required property must be given explicitly (--property KEY=VALUE) —
-    inventing a value would file memories under a scope recall filters would never match."""
+    migration marker when configured: a migrated memory has no live session, and recall
+    doesn't filter on it. Any other required property must be given explicitly
+    (--property KEY=VALUE) — inventing a value would file memories under a scope recall
+    filters would never match. When the group configures no properties, none are sent."""
     if "repo_name" in overrides:
-        # merged after the per-batch value, an override would silently file the whole
-        # store under one repo — the exact mis-filing this tool exists to avoid
+        # repo_name is resolved and attached per batch (when the group configures it);
+        # a global override would file the whole store under one repo
         sys.exit("repo_name is resolved per batch — use --map NAME=owner/repo to change it")
     props = {}
     required = (schema or {}).get("properties", [])
@@ -182,7 +161,9 @@ def _rollback(source_name):
 def main():
     ap = argparse.ArgumentParser(
         prog="engram-migrate",
-        description="Migrate memories from another local memory system into Engram.",
+        description="Migrate memories from another local memory system into Engram. "
+                    "Memories go through Engram's extraction pipeline, which classifies "
+                    "them into your group's topics itself.",
     )
     ap.add_argument("--source", default="claude-mem", choices=sorted(sources()))
     ap.add_argument("--db", help="override the source's default store location")
@@ -190,23 +171,12 @@ def main():
     ap.add_argument("--project", action="append", help="migrate only this source project (repeatable)")
     ap.add_argument("--map", action="append", metavar="NAME=owner/repo",
                     help="repo for a project the git probe can't resolve (repeatable)")
-    ap.add_argument("--topic-map", action="append", metavar="KIND=Topic",
-                    help=f"override kind→topic for custom groups; kinds: {', '.join(KINDS)} "
-                         "(pre-extracted mode only)")
     ap.add_argument("--property", action="append", dest="properties", metavar="KEY=VALUE",
                     help="extra scope property attached to every batch (repeatable)")
     ap.add_argument("--repos-dir", action="append",
                     help="extra dir to probe for project repos (default: cwd and its parent)")
-    ap.add_argument("--batch-size", type=_positive, default=None,
-                    help=f"items per pre-extracted batch (default {DEFAULT_BATCH_SIZE}; "
-                         "conversation mode groups per repo and day instead)")
     ap.add_argument("--limit", type=_positive,
                     help="cap the number of not-yet-migrated records (smoke runs)")
-    ap.add_argument("--input", choices=["pre-extracted", "conversation"],
-                    default="pre-extracted",
-                    help="ingestion path: pre-extracted stores composed notes verbatim with "
-                         "a [date] prefix; conversation re-extracts them with created_at "
-                         "date context (slower, chronological, extractor routes topics)")
     ap.add_argument("--execute", action="store_true",
                     help="actually migrate (default is a dry-run report)")
     ap.add_argument("--rollback", action="store_true",
@@ -215,15 +185,6 @@ def main():
     args = ap.parse_args()
     if args.rollback and args.execute:
         sys.exit("--rollback and --execute are mutually exclusive")
-    if args.input == "conversation":
-        # reject rather than silently ignore an explicit flag that has no effect here
-        if args.topic_map:
-            sys.exit("--topic-map has no effect with --input conversation "
-                     "(the extractor routes topics itself)")
-        if args.batch_size is not None:
-            sys.exit("--batch-size has no effect with --input conversation "
-                     "(batches are one conversation per repo and day)")
-    batch_size = args.batch_size or DEFAULT_BATCH_SIZE
 
     if args.rollback:
         return _rollback(args.source)
@@ -252,21 +213,19 @@ def main():
     repos_dirs += [os.path.dirname(cwd) or cwd, cwd]
     resolve = repo_resolver(repos_dirs, _parse_kv(args.map, "map"))
     schema = _schema(args.execute)
-    # in conversation mode the extractor routes topics itself, so the kind→topic mapping
-    # (and its validation) doesn't apply
-    topic_map = None
-    if args.input == "pre-extracted":
-        topic_map = _topic_map(_parse_kv(args.topic_map, "topic-map"), schema)
     batch_props = _batch_properties(schema, args.source, _parse_kv(args.properties, "property"))
+    # attach repo_name only when the group configures it; without it nothing can be
+    # mis-filed, so unresolvable projects don't need skipping either. With no schema
+    # (degraded dry-run) assume the default group's repo scoping.
+    attach_repo = "repo_name" in (schema or {}).get("properties", []) if schema else True
 
     def make_plan(skip_uids):
-        if args.input == "conversation":
-            return plan_conversations(records, resolve, skip_uids=skip_uids)
-        return plan(records, resolve, topic_map, batch_size, skip_uids=skip_uids)
+        return plan_conversations(records, resolve, skip_uids=skip_uids,
+                                  require_repo=attach_repo)
 
     if not args.execute:
         planned = make_plan(skip)
-        header = f"Engram migration (dry run, {args.input}) — source: {args.source} ({found})"
+        header = f"Engram migration (dry run) — source: {args.source} ({found})"
         print(render_report(planned, _source_lines(adapter, args.all), header))
         if batch_props:
             print(f"\nScope properties on every batch: {batch_props}")
@@ -283,7 +242,7 @@ def main():
         sys.exit("no stable identity — set git user.email or ENGRAM_USER_ID first.")
 
     reconcile_pending(cp, client, print)
-    if args.input == "conversation" and cp["pending"]:
+    if cp["pending"]:
         # an earlier-day run is still in flight; submitting later days now would let them
         # overtake it and break the chronological contract
         print(f"{len(cp['pending'])} earlier run(s) still in flight — wait for them to "
@@ -301,7 +260,7 @@ def main():
     save_checkpoint(cp_path, cp)
     skip = set(cp["done"]) | {u for uids in cp["pending"].values() for u in uids}
     planned = make_plan(skip)
-    header = f"Engram migration ({args.input}) — source: {args.source} ({found})"
+    header = f"Engram migration — source: {args.source} ({found})"
     print(render_report(planned, _source_lines(adapter, args.all), header))
     if not planned["batches"]:
         print("\nNothing to migrate.")
@@ -314,9 +273,8 @@ def main():
         # batch so progress is visible live
         print(*a, flush=True)
 
-    wait = WAIT_CONVERSATION if args.input == "conversation" else WAIT_PRE_EXTRACTED
     result = execute(planned, client, user_id, cp, cp_path, extra_properties=batch_props,
-                     log=progress, mode=args.input, wait_timeout=wait)
+                     log=progress, wait_timeout=WAIT_PIPELINE, attach_repo=attach_repo)
     print(
         f"\nDone: {result['committed']} batches committed, "
         f"{len(result['failed'])} failed, {result['pending']} still pending "

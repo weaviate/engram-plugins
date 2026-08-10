@@ -1,11 +1,11 @@
 """One-shot migration of memories from other local memory systems into Engram.
 
-A source adapter turns a foreign store into a stream of Records speaking the tiny KINDS
-vocabulary below; the engine (core.migrate.engine) maps kinds to the Engram group's topics,
-batches per repo scope, and submits either through the pre-extracted pipeline (content was
-already LLM-summarized by the source — no re-extraction) or, with --input conversation,
-through the extraction pipeline with the records' original dates as context. Adding a new
-source is one adapter module plus a sources() entry; the engine never changes.
+A source adapter turns a foreign store into a stream of Records; the engine
+(core.migrate.engine) groups them into chronological conversations and submits them
+through Engram's extraction pipeline with the records' original dates as context. Engram
+classifies each memory into the group's topics itself — the migration never picks a topic,
+so it works with any topic setup. Adding a new source is one adapter module plus a
+sources() entry; the engine never changes.
 
 An adapter is a class with:
     name                     registry key (the CLI --source value)
@@ -20,17 +20,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-# What adapters classify into. Deliberately small and Engram-agnostic: the engine maps these
-# to the group's actual topics (engine.KIND_TO_TOPIC, overridable via --topic-map), so
-# adapters stay valid for users with custom topic sets.
-KINDS = ("architecture", "process", "task", "preference")
-
 
 @dataclass
 class Record:
     uid: str  # stable per-source id — the checkpoint key, so re-runs skip migrated rows
-    kind: str  # one of KINDS
-    content: str  # composed memory text (the engine prepends the [date] prefix)
+    content: str  # composed memory text; Engram extracts and classifies it
     created_at: str | None  # ISO timestamp from the source, or None
     project: str | None  # source's project hint; the engine resolves it to a repo_name
 

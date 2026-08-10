@@ -27,10 +27,11 @@ bash <this skill's directory>/scripts/migrate.sh [flags]
 1. **Dry-run first, always.** Run with the user's flags but WITHOUT `--execute` or
    `--rollback`, even if the user included them — those only run after step 3. The dry-run
    writes nothing and shows exactly what would migrate, so the user decides from facts.
-2. **Present the report**: how many memories per topic and repo; which source projects were
+2. **Present the report**: how many memories per repo and day; which source projects were
    skipped because no git remote was found (offer `--map NAME=owner/repo` for ones worth
    keeping); that low-signal observation types are excluded by default (`--all` includes
-   them); and the sample item.
+   them); and the sample item. Topics are not part of the plan: Engram's extraction
+   classifies each memory into the group's topics itself.
 3. **Ask the user explicitly whether to proceed.** Executing writes to their Engram cloud
    store — never run `--execute` or `--rollback` without a fresh confirmation from the
    user in this conversation.
@@ -44,11 +45,11 @@ bash <this skill's directory>/scripts/migrate.sh [flags]
 ## Options to surface when relevant
 
 - `--limit N --execute` — a small smoke run before committing to a full migration.
-- `--input conversation` — re-import through Engram's extraction pipeline with
-  original-date context (slower, strictly chronological, the extractor routes topics).
-  Warn the user: the search-visible `created_at` timestamp is still the ingestion time in
-  either mode — that's a server-side limit; only the memory *content* carries real dates.
 - `--rollback` — deletes every memory the migration created (via the server's per-run
   manifests, so organically stored memories are untouchable) and resets the checkpoint.
   Destructive: treat like `--execute`, explicit confirmation first.
 - `--source NAME` / `--db PATH` — other adapters or a non-default store location.
+
+If asked about timestamps: memories carry their original dates as extraction context, so
+the memory *content* reflects when things happened — but the `created_at` shown by search
+is always the ingestion time; that's a server-side limit.
