@@ -114,9 +114,7 @@ class ClaudeMemorySource:
     def available(self):
         return self.db_path if self._files() else None
 
-    def records(self, include_all=False):
-        # include_all is moot for this source: every file is a deliberately saved fact,
-        # there is no low-signal tier to exclude
+    def records(self):
         projects = {}
         for f in self._files():
             proj_name = os.path.basename(os.path.dirname(os.path.dirname(f)))
@@ -138,7 +136,7 @@ class ClaudeMemorySource:
                 project=projects[proj_name] or proj_name,
             )
 
-    def describe_selection(self, include_all=False):
+    def describe_selection(self):
         files = self._files()
         counts, decodable, unresolved = {}, {}, set()
         for f in files:
