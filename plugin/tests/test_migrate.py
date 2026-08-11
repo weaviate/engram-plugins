@@ -7,6 +7,7 @@ client covers execution. The SDK is assumed present — run under the plugin ven
 import json
 import os
 import sqlite3
+import subprocess
 import tempfile
 import time
 import unittest
@@ -213,7 +214,7 @@ class ProjectDirFinderTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             proj = os.path.join(tmp, "proj")
             os.makedirs(proj)
-            find = project_dir_finder([])  # no repos dirs needed for absolute paths
+            find = project_dir_finder([], {}, [])  # layers unused for absolute paths
             self.assertEqual(find(proj), proj)
             self.assertIsNone(find(os.path.join(tmp, "missing")))
 
@@ -223,10 +224,10 @@ class ProjectDirFinderTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             proj = os.path.join(tmp, "proj")
             os.makedirs(proj)
-            find = project_dir_finder([tmp])
+            find = project_dir_finder([tmp], {}, [])
             self.assertEqual(find("proj"), proj)
-            # the repos dir itself matches when its basename is the project name
-            self.assertEqual(project_dir_finder([proj])("proj"), proj)
+            # the dir itself matches when its basename is the project name
+            self.assertEqual(project_dir_finder([proj], {}, [])("proj"), proj)
 
 
 class EngineTest(unittest.TestCase):

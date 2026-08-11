@@ -4,9 +4,8 @@ Claude Code keeps per-project memories under ~/.claude/projects/<munged-path>/me
 (MEMORY.md is an index, not a fact, and is skipped). They are siloed to the project they
 were written in; migrating them into Engram makes them recallable everywhere.
 
-The munged directory name is decoded back to a real path by a filesystem-pruned search
-(the munging maps both '/' and '.' to '-', so decoding is ambiguous without checking what
-actually exists on disk). The decoded absolute path becomes the record's project, so the
+The munged directory name is decoded back to a real path by the shared registry decoder
+(core.migrate.claude_projects). The decoded absolute path becomes the record's project, so the
 engine resolves repo_name from that directory's git remote — the same property the store
 hook attaches, keeping migrated and hook-stored memories identically scoped.
 
@@ -20,54 +19,10 @@ import os
 from datetime import datetime, timezone
 
 from . import Record
+from .claude_projects import decode_project_dir
 from ..util import git_repo
 
 DEFAULT_DIR = "~/.claude/projects"
-
-def decode_project_dir(name):
-    """Decode a munged project dir name (e.g. '-Users-me-src-repo--bare') back to candidate
-    absolute paths. The munging maps '/' and '.' to '-' and keeps literal '-', so each '-'
-    is a three-way branch — but every branch is pruned against the real directory listing
-    (a component prefix that matches no entry is dead), which bounds the search by what
-    exists on disk instead of exponential in the dash count (an unpruned search hangs on
-    ~25 dashes — an ordinary deep kebab-case path). Iterative on an explicit stack so a
-    pathological name can't hit the recursion limit. A candidate must re-munge to exactly
-    `name`, which also rejects paths mangled by accidental '..' components."""
-    if not name.startswith("-"):
-        return []
-
-    listings = {}
-
-    def entries(d):
-        if d not in listings:
-            try:
-                listings[d] = os.listdir(d)
-            except OSError:
-                listings[d] = []
-        return listings[d]
-
-    matches = []
-    stack = [("/", "", name[1:])]  # (confirmed dir, partial component, rest of name)
-    while stack:
-        dirpath, partial, rest = stack.pop()
-        i = rest.find("-")
-        if i < 0:
-            full = os.path.join(dirpath, partial + rest)
-            if os.path.isdir(full):
-                matches.append(full)
-            continue
-        comp, tail = partial + rest[:i], rest[i + 1 :]
-        # '/' branch: comp is a complete path component
-        if comp in entries(dirpath) and os.path.isdir(os.path.join(dirpath, comp)):
-            stack.append((os.path.join(dirpath, comp), "", tail))
-        # '.'/'-' branches: the component continues — only viable if some real entry
-        # starts with it
-        for ch in (".", "-"):
-            nxt = comp + ch
-            if any(e.startswith(nxt) for e in entries(dirpath)):
-                stack.append((dirpath, nxt, tail))
-    return [m for m in matches if m.replace("/", "-").replace(".", "-") == name]
-
 
 def _resolve_project(name):
     """Best decoded path for a munged dir name: prefer a candidate with a git origin (the
