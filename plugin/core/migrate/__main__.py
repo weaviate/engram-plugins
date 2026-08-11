@@ -111,9 +111,9 @@ def _load_checkpoint_or_exit(path):
         sys.exit(str(e))
 
 
-def _source_lines(adapter, include_all):
+def _source_lines(adapter):
     fn = getattr(adapter, "describe_selection", None)  # optional in the adapter contract
-    return fn(include_all) if fn else []
+    return fn() if fn else []
 
 
 def _rollback(source_name):
@@ -173,7 +173,6 @@ def main():
     )
     ap.add_argument("--source", default="claude-mem", choices=sorted(sources()))
     ap.add_argument("--db", help="override the source's default store location")
-    ap.add_argument("--all", action="store_true", help="include low-signal record types")
     ap.add_argument("--project", action="append", help="migrate only this source project (repeatable)")
     ap.add_argument("--map", action="append", metavar="NAME=owner/repo",
                     help="repo_name for a project whose directory can't be found (repeatable)")
@@ -204,7 +203,7 @@ def main():
     cp = _load_checkpoint_or_exit(cp_path)
     skip = set(cp["done"]) | {u for uids in cp["pending"].values() for u in uids}
 
-    records = adapter.records(include_all=args.all)
+    records = adapter.records()
     if args.project:
         wanted = set(args.project)
         records = (r for r in records if r.project in wanted)
@@ -229,7 +228,7 @@ def main():
     if not args.execute:
         planned = plan_conversations(records, props_for, skip_uids=skip)
         header = f"Engram migration (dry run) — source: {args.source} ({found})"
-        print(render_report(planned, _source_lines(adapter, args.all), header))
+        print(render_report(planned, _source_lines(adapter), header))
         print("\nDry run — nothing written. Add --execute to migrate.")
         return 0
 
@@ -260,7 +259,7 @@ def main():
     skip = set(cp["done"]) | {u for uids in cp["pending"].values() for u in uids}
     planned = plan_conversations(records, props_for, skip_uids=skip)
     header = f"Engram migration — source: {args.source} ({found})"
-    print(render_report(planned, _source_lines(adapter, args.all), header))
+    print(render_report(planned, _source_lines(adapter), header))
     if not planned["batches"] and not cp["pending"]:
         print("\nNothing to migrate.")
         return 0

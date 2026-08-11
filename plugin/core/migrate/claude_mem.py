@@ -13,14 +13,6 @@ from . import Record
 
 DEFAULT_DB = "~/.claude-mem/claude-mem.db"
 
-# Migrated by default. discovery/change/refactor are transient per-session observations —
-# the bulk of a store (>80% here) with low recall value — so they ride behind --all instead
-# of polluting recall out of the box. A type outside ALL_TYPES (from a newer claude-mem) is
-# skipped and reported by describe_selection rather than migrated blind.
-CURATED_TYPES = ("decision", "bugfix", "feature", "security_alert", "security_note")
-ALL_TYPES = CURATED_TYPES + ("discovery", "change", "refactor")
-
-
 def _obs_content(title, narrative, text, facts):
     """Title + narrative is the memory; `text` is the pre-narrative legacy column. Rows with
     neither fold the `facts` JSON array into readable text instead of being dropped."""
@@ -67,26 +59,23 @@ class ClaudeMemSource:
         # parsed as query/fragment — a crafted "...db?mode=rw" must not defeat ro.
         return sqlite3.connect("file:" + quote(self.db_path, safe="/") + "?mode=ro", uri=True)
 
-    def _types(self, include_all):
-        return list(ALL_TYPES) if include_all else list(CURATED_TYPES)
-
-    def records(self, include_all=False):
+    def records(self):
+        # every observation type migrates — Engram's extraction decides what each memory
+        # becomes and what to keep, so the adapter does no relevance filtering of its own
         con = self._connect()
         try:
-            yield from self._observations(con, include_all)
+            yield from self._observations(con)
             yield from self._summaries(con)
         finally:
             con.close()
 
-    def _observations(self, con, include_all):
-        types = self._types(include_all)
+    def _observations(self, con):
         # merged_into_project is claude-mem's own project rename/merge — honor it
         q = (
             "SELECT id, title, narrative, text, facts, created_at, "
-            "COALESCE(merged_into_project, project) FROM observations "
-            f"WHERE type IN ({','.join('?' * len(types))}) ORDER BY id"
+            "COALESCE(merged_into_project, project) FROM observations ORDER BY id"
         )
-        for oid, title, narrative, text, facts, created, project in con.execute(q, types):
+        for oid, title, narrative, text, facts, created, project in con.execute(q):
             content = _obs_content(title, narrative, text, facts)
             if not content:
                 continue
@@ -113,34 +102,21 @@ class ClaudeMemSource:
                 project=row[7],
             )
 
-    def describe_selection(self, include_all=False):
-        """Dry-run report lines: what's included, what --all would add, unknown types."""
+    def describe_selection(self):
+        """Dry-run report lines: observation counts by type, plus summaries."""
         con = self._connect()
         try:
-            # NULL types can't be migrated (records() filters on type IN (...)) and would
-            # crash the sorted() below — drop them from the report rather than the CLI
             counts = dict(
                 con.execute(
-                    "SELECT type, COUNT(*) FROM observations "
-                    "WHERE type IS NOT NULL GROUP BY type"
+                    "SELECT COALESCE(type, '(untyped)'), COUNT(*) "
+                    "FROM observations GROUP BY 1"
                 )
             )
             (n_sum,) = con.execute("SELECT COUNT(*) FROM session_summaries").fetchone()
         finally:
             con.close()
-
-        def fmt(names):
-            return ", ".join(f"{t} ({counts[t]})" for t in sorted(names)) or "none"
-
-        chosen = set(self._types(include_all))
-        excluded = [t for t in counts if t in ALL_TYPES and t not in chosen]
-        unknown = [t for t in counts if t not in ALL_TYPES]
-        lines = [
-            f"observations included: {fmt(t for t in counts if t in chosen)}",
+        by_type = ", ".join(f"{t} ({n})" for t, n in sorted(counts.items())) or "none"
+        return [
+            f"observations included: {by_type}",
             f"session summaries included: {n_sum}",
         ]
-        if excluded:
-            lines.append(f"observations excluded (add --all): {fmt(excluded)}")
-        if unknown:
-            lines.append(f"unknown observation types skipped: {fmt(unknown)}")
-        return lines

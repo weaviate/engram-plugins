@@ -29,9 +29,9 @@ bash <this skill's directory>/scripts/migrate.sh [flags]
    writes nothing and shows exactly what would migrate, so the user decides from facts.
 2. **Present the report**: how many memories per repo and day; which source projects were
    skipped because no git remote was found (offer `--map NAME=owner/repo` for ones worth
-   keeping); that low-signal observation types are excluded by default (`--all` includes
-   them); and the sample item. Topics are not part of the plan: Engram's extraction
-   classifies each memory into the group's topics itself.
+   keeping); and the sample item. Topics are not part of the plan, and the source is not
+   pre-filtered: Engram's extraction classifies each memory into the group's topics and
+   decides what to keep.
 3. **Ask the user explicitly whether to proceed.** Executing writes to their Engram cloud
    store — never run `--execute` or `--rollback` without a fresh confirmation from the
    user in this conversation.

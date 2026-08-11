@@ -137,8 +137,6 @@ the ingestion time — Weaviate does not allow overriding it.
 
 Useful flags:
 
-- `--all` — include low-signal record types (transient per-session observations), excluded
-  by default to keep recall sharp.
 - `--map NAME=owner/repo` — map a source project whose repo can't be inferred from a git
   remote (unmapped projects are skipped and reported, never mis-filed).
 - `--project NAME` — migrate a single project; `--limit N` — smoke-test with a few items.

@@ -76,11 +76,13 @@ class ClaudeMemAdapterTest(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def test_curated_selection_and_composition(self):
+    def test_selection_and_composition(self):
         recs = {r.uid: r for r in self.source.records()}
+        # every observation migrates, discovery and unknown types included — Engram's
+        # extraction decides what to keep
         self.assertEqual(
-            set(recs), {"obs:1", "obs:2", "obs:3", "sum:10"}
-        )  # no discovery, no unknown type
+            set(recs), {"obs:1", "obs:2", "obs:3", "obs:4", "obs:5", "sum:10"}
+        )
         self.assertEqual(recs["obs:1"].content, "Chose X — Because Y.")
         self.assertEqual(recs["obs:2"].project, "alpha")  # merged_into_project wins
         self.assertEqual(recs["obs:2"].content, "Fixed Z — Legacy body")
@@ -91,15 +93,10 @@ class ClaudeMemAdapterTest(unittest.TestCase):
             "Session summary —\nRequest: Do a thing\nLearned: Learned it",
         )
 
-    def test_all_includes_low_signal_types(self):
-        uids = {r.uid for r in self.source.records(include_all=True)}
-        self.assertIn("obs:4", uids)
-        self.assertNotIn("obs:5", uids)  # unknown types stay out even with --all
-
     def test_describe_selection(self):
         text = "\n".join(self.source.describe_selection())
-        self.assertIn("discovery (1)", text)  # reported as excluded
-        self.assertIn("someday_new (1)", text)  # reported as unknown
+        self.assertIn("discovery (1)", text)
+        self.assertIn("someday_new (1)", text)
         self.assertIn("session summaries included: 1", text)
 
     def test_readonly(self):

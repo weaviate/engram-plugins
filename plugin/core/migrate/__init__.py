@@ -12,8 +12,9 @@ An adapter is a class with:
     __init__(path=None)      path overrides the source's default store location
     db_path                  resolved store location (used in CLI error messages)
     available()              path/description of the detected install, or None
-    records(include_all)     iterator of Record
-    describe_selection(include_all)   optional: human lines for the dry-run report
+    records()                iterator of Record — every record; Engram's extraction
+                             decides what each memory becomes and what to keep
+    describe_selection()     optional: human lines for the dry-run report
 """
 
 from __future__ import annotations
