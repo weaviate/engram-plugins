@@ -27,9 +27,11 @@ bash <this skill's directory>/scripts/migrate.sh [flags]
 1. **Dry-run first, always.** Run with the user's flags but WITHOUT `--execute` or
    `--rollback`, even if the user included them — those only run after step 3. The dry-run
    writes nothing and shows exactly what would migrate, so the user decides from facts.
-2. **Present the report**: how many memories per repo and day; which source projects were
-   skipped because no git remote was found (offer `--map NAME=owner/repo` for ones worth
-   keeping); and the sample item. Topics are not part of the plan, and the source is not
+2. **Present the report**: how many memories per scope and day; which source projects
+   were skipped because their required scope properties could not be resolved — usually
+   the project's directory no longer exists anywhere the CLI looks (offer
+   `--map=NAME=owner/repo`, or `--repos-dir DIR` if their repositories live somewhere
+   unusual); and the sample item. Topics are not part of the plan, and the source is not
    pre-filtered: Engram's extraction classifies each memory into the group's topics and
    decides what to keep.
 3. **Ask the user explicitly whether to proceed.** Executing writes to their Engram cloud
@@ -41,12 +43,15 @@ bash <this skill's directory>/scripts/migrate.sh [flags]
    committed. Exit codes: 0 done, 1 failed submissions/runs, 3 some runs still in the
    pipeline — re-running the same command reconciles and continues safely from the
    checkpoint.
-5. **Summarize**: committed / failed / still pending, and remind the user that a re-run
-   retries only what's missing.
+5. **Summarize**: submitted / committed / failed / still in the pipeline, and remind the
+   user that a re-run retries only what's missing.
 
 ## Options to surface when relevant
 
 - `--limit N --execute` — a small smoke run before committing to a full migration.
+- `--repos-dir DIR` — extra directory to search for project repositories (repeatable).
+  Rarely needed: project directories are found through Claude Code's own session
+  registry, which records every directory the user worked in regardless of layout.
 - `--rollback` — deletes every memory the migration created (via the server's per-run
   manifests, so organically stored memories are untouchable) and resets the checkpoint.
   Destructive: treat like `--execute`, explicit confirmation first.

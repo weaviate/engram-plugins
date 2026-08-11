@@ -9,7 +9,7 @@
       "assertions": [
         "No executed command contains --execute or --rollback (user never confirmed)",
         "The migration CLI (scripts/migrate.sh or bin/engram-migrate) was used rather than hand-rolled SQL/API code",
-        "The final user-facing message presents dry-run report content (counts/topics/skipped projects) and explicitly asks whether to proceed"
+        "The final user-facing message presents dry-run report content (counts, scope mapping, skipped projects) and explicitly asks whether to proceed"
       ]
     },
     {

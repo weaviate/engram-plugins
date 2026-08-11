@@ -137,9 +137,14 @@ the ingestion time — Weaviate does not allow overriding it.
 
 Useful flags:
 
-- `--map NAME=owner/repo` — map a source project whose repo can't be inferred from a git
-  remote (unmapped projects are skipped and reported, never mis-filed).
-- `--project NAME` — migrate a single project; `--limit N` — smoke-test with a few items.
+- `--map NAME=owner/repo` — set the repo for a project whose directory can't be found
+  (projects whose required scope properties can't be resolved are skipped and reported).
+- `--repos-dir DIR` — extra directory to search for project repositories (repeatable).
+  Rarely needed: directories are found through Claude Code's session registry
+  (`~/.claude/projects/`), which records every directory you ever ran a session in —
+  so the search works for any workspace layout without configuration.
+- `--project NAME` — migrate only the named projects (repeatable); `--limit N` —
+  smoke-test with a few items.
 - `--property KEY=VALUE` — extra scope property for every batch. Required scope properties
   are checked up front; `session_id` (meaningless for migrated data) is auto-filled with a
   `migration:<source>` marker when your group requires it.

@@ -7,19 +7,25 @@ client covers execution. The SDK is assumed present — run under the plugin ven
 import json
 import os
 import sqlite3
+import subprocess
 import tempfile
 import unittest
+import unittest.mock
 from types import SimpleNamespace
 
 from core.migrate import Record
 from core.migrate.claude_mem import ClaudeMemSource
+from core.migrate.claude_projects import index_by_basename
 from core.migrate.engine import (
+    execute,
     load_checkpoint,
     plan_conversations,
+    project_dir_finder,
     reconcile_pending,
     render_report,
     rollback,
     save_checkpoint,
+    settle,
 )
 
 
@@ -48,10 +54,10 @@ def make_db(path):
             # neither narrative nor text → facts fallback
             (3, "alpha", None, "feature", "Added W", None,
              json.dumps(["f1", "f2"]), "2026-07-01T00:00:00Z", None),
-            # excluded by default
+            # a low-signal type: migrates like everything else, extraction decides
             (4, "alpha", None, "discovery", "Noticed V", "Detail.", None,
              "2026-07-02T00:00:00Z", None),
-            # unknown type → never yielded
+            # a type this adapter has never heard of: migrates all the same
             (5, "alpha", None, "someday_new", "???", "Detail.", None,
              "2026-07-03T00:00:00Z", None),
         ],
@@ -97,7 +103,7 @@ class ClaudeMemAdapterTest(unittest.TestCase):
         text = "\n".join(self.source.describe_selection())
         self.assertIn("discovery (1)", text)
         self.assertIn("someday_new (1)", text)
-        self.assertIn("session summaries included: 1", text)
+        self.assertIn("session summary rows: 1", text)
 
     def test_readonly(self):
         con = self.source._connect()
@@ -263,8 +269,6 @@ class ExecuteTest(unittest.TestCase):
         }
 
     def test_execute_submits_all_without_waiting(self):
-        from core.migrate.engine import execute
-
         calls = []
         with tempfile.TemporaryDirectory() as tmp:
             cp_path = os.path.join(tmp, "cp.json")
@@ -282,8 +286,6 @@ class ExecuteTest(unittest.TestCase):
                              {"r1": ["a1", "a2"], "r2": ["b1"]})
 
     def test_execute_sends_no_properties_when_none_resolved(self):
-        from core.migrate.engine import execute
-
         calls = []
         planned = {"batches": [("proj", {}, [("a1", "2026-05-06T05:00:00Z", "one")])]}
         with tempfile.TemporaryDirectory() as tmp:
@@ -293,8 +295,6 @@ class ExecuteTest(unittest.TestCase):
         self.assertEqual([props for _, _, props in calls], [None])
 
     def test_execute_stops_on_submit_error(self):
-        from core.migrate.engine import execute
-
         def add(inp, user_id=None, properties=None):
             raise RuntimeError("missing required property")
 
@@ -310,8 +310,6 @@ class ExecuteTest(unittest.TestCase):
 
     def test_execute_builds_conversation_input(self):
         from engram import ConversationInput
-
-        from core.migrate.engine import execute
 
         submitted = []
 
@@ -338,8 +336,6 @@ class ExecuteTest(unittest.TestCase):
         self.assertEqual(inp.messages[1].created_at, "2026-05-06T05:00:00Z")
 
     def test_settle_confirms_and_releases(self):
-        from core.migrate.engine import settle
-
         statuses = {
             "r1": SimpleNamespace(status="completed", error=None),
             "r2": SimpleNamespace(status="failed", error="boom"),
@@ -352,6 +348,114 @@ class ExecuteTest(unittest.TestCase):
         self.assertEqual((committed, failed), (1, ["r2"]))
         self.assertEqual(cp["done"], {"a1": "r1", "a2": "r1"})
         self.assertEqual(cp["pending"], {})  # failed run released for resubmission
+
+
+class ProjectDiscoveryTest(unittest.TestCase):
+    def _registry(self, root, *paths):
+        reg = os.path.join(root, "registry")
+        os.makedirs(reg, exist_ok=True)
+        for path in paths:
+            os.makedirs(path, exist_ok=True)
+            os.makedirs(os.path.join(reg, path.replace("/", "-").replace(".", "-")),
+                        exist_ok=True)
+        return reg
+
+    def test_registry_index_decodes_any_layout(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            deep = os.path.join(tmp, "work", "clients", "acme.io", "api")
+            reg = self._registry(tmp, deep)
+            index = index_by_basename(reg)
+            self.assertEqual(index["api"], [deep])
+
+    def test_finder_layers_explicit_then_registry_then_fallback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            explicit = os.path.join(tmp, "explicit", "proj")
+            registry_home = os.path.join(tmp, "elsewhere", "proj")
+            fallback = os.path.join(tmp, "fallback", "proj")
+            for d in (explicit, registry_home, fallback):
+                os.makedirs(d)
+            index = {"proj": [registry_home]}
+            # explicit dirs win over the registry
+            find = project_dir_finder([os.path.dirname(explicit)], index,
+                                      [os.path.dirname(fallback)])
+            self.assertEqual(find("proj"), explicit)
+            # registry wins over fallback dirs
+            find = project_dir_finder([], index, [os.path.dirname(fallback)])
+            self.assertEqual(find("proj"), registry_home)
+            # fallback used when the registry has no entry
+            find = project_dir_finder([], {}, [os.path.dirname(fallback)])
+            self.assertEqual(find("proj"), fallback)
+            self.assertIsNone(project_dir_finder([], {}, [])("proj"))
+
+    def test_registry_candidates_prefer_git_remote(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            plain = os.path.join(tmp, "a", "proj")
+            remoted = os.path.join(tmp, "b", "proj")
+            os.makedirs(plain)
+            os.makedirs(remoted)
+            subprocess.run(["git", "init", "-q", remoted], check=True)
+            subprocess.run(["git", "-C", remoted, "remote", "add", "origin",
+                            "git@github.com:acme/proj.git"], check=True)
+            find = project_dir_finder([], {"proj": [plain, remoted]}, [])
+            self.assertEqual(find("proj"), remoted)
+
+
+class PropsBuilderTest(unittest.TestCase):
+    SCHEMA = {"properties": ["repo_name", "session_id"]}
+
+    def test_resolution_error_skips_project_instead_of_crashing(self):
+        def broken(cwd, marker):
+            raise ValueError("invalid JSON in .engram.json")
+
+        with unittest.mock.patch("core.scope.resolve_scope", broken):
+            from core.migrate.__main__ import _props_builder
+
+            props_for = _props_builder(self.SCHEMA, "claude-mem",
+                                       lambda p: "/some/dir", {}, {})
+            self.assertIsNone(props_for("proj"))
+
+    def test_resolved_props_flow_through_with_map_and_extra(self):
+        def ok(cwd, marker):
+            return {"repo_name": "acme/from-git", "session_id": marker}, True, []
+
+        with unittest.mock.patch("core.scope.resolve_scope", ok):
+            from core.migrate.__main__ import _props_builder
+
+            props_for = _props_builder(self.SCHEMA, "claude-mem",
+                                       lambda p: "/some/dir",
+                                       {"proj": "acme/mapped"}, {"team": "payments"})
+            self.assertEqual(props_for("proj"),
+                             {"repo_name": "acme/mapped",
+                              "session_id": "migration:claude-mem",
+                              "team": "payments"})
+
+    def test_dirless_project_fills_marker_or_skips(self):
+        from core.migrate.__main__ import _props_builder
+
+        def no_dir(project):
+            return None
+
+        # repo_name required and unmappable → skip
+        self.assertIsNone(
+            _props_builder(self.SCHEMA, "claude-mem", no_dir, {}, {})("proj"))
+        # only session_id required → marker fills it
+        self.assertEqual(
+            _props_builder({"properties": ["session_id"]}, "claude-mem",
+                           no_dir, {}, {})("proj"),
+            {"session_id": "migration:claude-mem"})
+
+
+class SettleTimeoutTest(unittest.TestCase):
+    def test_settle_returns_with_pending_on_timeout(self):
+        client = SimpleNamespace(runs=SimpleNamespace(
+            get=lambda rid: SimpleNamespace(status="running", error=None)))
+        cp = {"done": {}, "pending": {"r1": ["a1"]}}
+        with tempfile.TemporaryDirectory() as tmp:
+            committed, failed = settle(cp, client, os.path.join(tmp, "cp.json"),
+                                       timeout=0.01, interval=0, log=lambda *_: None)
+        self.assertEqual((committed, failed), (0, []))
+        self.assertEqual(cp["pending"], {"r1": ["a1"]})  # reserved for the next run
+
 
 
 if __name__ == "__main__":

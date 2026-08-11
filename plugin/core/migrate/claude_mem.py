@@ -117,6 +117,7 @@ class ClaudeMemSource:
             con.close()
         by_type = ", ".join(f"{t} ({n})" for t, n in sorted(counts.items())) or "none"
         return [
-            f"observations included: {by_type}",
-            f"session summaries included: {n_sum}",
+            f"observation rows: {by_type} — rows with no usable content are dropped "
+            "at planning",
+            f"session summary rows: {n_sum}",
         ]

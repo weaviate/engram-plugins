@@ -3,14 +3,16 @@
 Run via bin/engram-migrate (the migrate-memories skill's scripts/migrate.sh delegates
 there too), which sets up the plugin venv and data dir.
 
-Exit codes: 0 done, 1 failed submissions/runs, 2 usage error (argparse), 3 incomplete —
-runs still in the pipeline, re-run to reconcile."""
+Exit codes: 0 done, 1 failure (failed submissions/runs, or a usage mistake this CLI
+detects itself), 2 usage error caught by argparse, 3 incomplete — runs still in the
+pipeline, re-run to reconcile."""
 
 import argparse
 import os
 import sys
 
 from . import sources
+from .claude_projects import index_by_basename
 from .engine import (
     checkpoint_path,
     execute,
@@ -89,7 +91,14 @@ def _props_builder(schema, source_name, find_dir, map_overrides, extra):
         mapped = map_overrides.get(project)
         d = find_dir(project) if project else None
         if d:
-            props, _user_required, _unresolved = resolve_scope(d, marker)
+            try:
+                props, _user_required, _unresolved = resolve_scope(d, marker)
+            except Exception as e:
+                # one project's broken .engram.json, or an unreachable schema on an
+                # uncached dry-run, must not abort the whole migration — the project is
+                # reported as skipped instead (called once per project: planner memoizes)
+                print(f"note: {project}: scope resolution failed ({e}) — skipped")
+                return None
         else:
             # no directory to resolve from: only the session marker (when the group uses
             # it) and explicit overrides are trustworthy
@@ -153,10 +162,16 @@ def _rollback(source_name):
               f"{len(errors)} runs not fully rolled back — checkpoint kept, re-run "
               "--rollback to retry.")
         return 1
-    if deleted == 0 and gone > 0:
-        print(f"\nEvery delete reported the memory as already gone ({gone}). That can mean "
-              "an earlier rollback finished — or an identity mismatch. Checkpoint kept; "
-              "re-run to confirm or inspect it first.")
+    if deleted == 0 and gone > 0 and not recorded:
+        # only an unstamped (legacy) checkpoint leaves the all-gone case ambiguous: with
+        # a matching recorded identity (checked above) all-gone means an earlier rollback
+        # already deleted everything, so falling through to the reset is safe — without
+        # the stamp it could equally be an identity mismatch, so keep the record
+        print(f"\nEvery delete reported the memory as already gone ({gone}). That can "
+              "mean an earlier rollback finished — or an identity mismatch (this "
+              "checkpoint predates identity stamping, so it cannot be verified). "
+              f"Checkpoint kept; delete {cp_path} yourself once you have confirmed the "
+              "memories are really gone.")
         return 1
     save_checkpoint(cp_path, {"done": {}, "pending": {}})
     print(f"\nDeleted {deleted} memories ({gone} already gone). Checkpoint reset — "
@@ -219,9 +234,11 @@ def main():
         # store under one repo
         sys.exit("repo_name is resolved per project — use --map NAME=owner/repo to change it")
     cwd = os.getcwd()
-    repos_dirs = [os.path.expanduser(d) for d in (args.repos_dir or [])]
-    repos_dirs += [os.path.dirname(cwd) or cwd, cwd]
-    find_dir = project_dir_finder(repos_dirs)
+    find_dir = project_dir_finder(
+        explicit_dirs=[os.path.expanduser(d) for d in (args.repos_dir or [])],
+        registry_index=index_by_basename(),
+        fallback_dirs=[os.path.dirname(cwd) or cwd, cwd],
+    )
     schema = _schema(args.execute)
     props_for = _props_builder(schema, args.source, find_dir, _parse_kv(args.map, "map"), extra)
 
@@ -246,7 +263,7 @@ def main():
         # per line so progress is visible live
         print(*a, flush=True)
 
-    reconcile_pending(cp, client, progress)
+    pre_done, pre_failed = reconcile_pending(cp, client, progress)
     # stamp the checkpoint with what this migration ran against, so a later --db switch is
     # visible and --rollback can detect an identity change
     prev_db = cp.get("source_db")
@@ -270,7 +287,10 @@ def main():
         progress(f"\n{result['submitted']} conversation(s) submitted — waiting for the "
                  "pipeline to settle …")
     committed, failed_runs = settle(cp, client, cp_path, SETTLE_TIMEOUT, log=progress)
-    failures = len(result["failed"]) + len(failed_runs)
+    # runs reconciled at startup (left over from a previous invocation) belong in the
+    # totals too — without them a resumed run under-reports what actually happened
+    committed += pre_done
+    failures = len(result["failed"]) + len(failed_runs) + len(pre_failed)
     print(
         f"\nDone: {result['submitted']} conversations submitted, {committed} committed, "
         f"{failures} failed, {len(cp['pending'])} still in the pipeline "

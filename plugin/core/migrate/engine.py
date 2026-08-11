@@ -23,27 +23,46 @@ import time
 
 from engram import ConversationInput, MessageInput
 
+from ..util import git_repo
 
-def project_dir_finder(repos_dirs):
-    """project name → existing directory, or None. Probes each repos dir for a same-named
-    child — and the dir itself when its basename matches, since sources record the
-    workspace root as a project too. Memoized: probing hits the filesystem per project."""
+
+def project_dir_finder(explicit_dirs, registry_index, fallback_dirs):
+    """project name → existing directory, or None. Layered so no workspace layout is
+    assumed:
+
+    1. explicit dirs (--repos-dir) — the user's stated locations always win;
+    2. Claude Code's session registry index (claude_projects.index_by_basename) — the
+       decoded record of every directory the user actually ran sessions in, whatever
+       their layout; among matches, a directory with a git remote wins, then the most
+       recent session;
+    3. fallback dirs (the current directory and its parent) — for a store copied from a
+       machine whose registry isn't available here.
+
+    Probing a dir list checks each dir for a same-named child — and the dir itself when
+    its basename matches, since sources record the workspace root as a project too.
+    Memoized: probing hits the filesystem (and git) per project."""
     cache = {}
 
-    def find(project):
-        if project in cache:
-            return cache[project]
-        found = None
-        for base in repos_dirs:
+    def probe(dirs, project):
+        for base in dirs:
             candidates = [os.path.join(base, project)]
             if os.path.basename(os.path.normpath(base)) == project:
                 candidates.insert(0, base)
             for c in candidates:
                 if os.path.isdir(c):
-                    found = c
-                    break
-            if found:
-                break
+                    return c
+        return None
+
+    def find(project):
+        if project in cache:
+            return cache[project]
+        found = probe(explicit_dirs, project)
+        if not found:
+            candidates = registry_index.get(project) or []
+            found = next((c for c in candidates if git_repo(c)), None) \
+                or (candidates[0] if candidates else None)
+        if not found:
+            found = probe(fallback_dirs, project)
         cache[project] = found
         return found
 
@@ -122,7 +141,8 @@ def render_report(planned, source_lines, header):
     if planned["skipped"]:
         lines.append(
             "  skipped — the group's required scope properties could not be resolved "
-            "(--map=NAME=owner/repo supplies repo_name):"
+            "(--map=NAME=owner/repo supplies repo_name; --property KEY=VALUE supplies "
+            "any other):"
         )
         for project in sorted(planned["skipped"]):
             note = "  — no project recorded; --map cannot recover these" if project == "(none)" else ""
@@ -130,7 +150,7 @@ def render_report(planned, source_lines, header):
     lines += [
         "",
         f"Plan: {planned['items']} memories in {len(planned['batches'])} conversations "
-        f"across {label_count} projects (Engram classifies topics itself)",
+        f"across {label_count} scopes (Engram classifies topics itself)",
     ]
     if planned["already"]:
         # pending (in-flight, unconfirmed) uids are counted here too — the checkpoint
