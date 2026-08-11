@@ -35,10 +35,12 @@ bash <this skill's directory>/scripts/migrate.sh [flags]
 3. **Ask the user explicitly whether to proceed.** Executing writes to their Engram cloud
    store — never run `--execute` or `--rollback` without a fresh confirmation from the
    user in this conversation.
-4. **Execute**: re-run the same command with `--execute` appended. Batches submit serially
-   and each waits for the Engram pipeline to commit, so large stores take a while — that is
-   expected, not a hang. Exit codes: 0 done, 1 some batches failed, 3 incomplete (batches
-   still pending) — re-running the same command continues safely from the checkpoint.
+4. **Execute**: re-run the same command with `--execute` appended. Conversations are
+   submitted in chronological order without waiting on each pipeline run (Engram queues
+   internally); the command then waits for the pipeline to settle and reports what
+   committed. Exit codes: 0 done, 1 failed submissions/runs, 3 some runs still in the
+   pipeline — re-running the same command reconciles and continues safely from the
+   checkpoint.
 5. **Summarize**: committed / failed / still pending, and remind the user that a re-run
    retries only what's missing.
 

@@ -129,8 +129,10 @@ so re-runs only send what's missing. Memories are grouped per repo and day into
 chronological conversations and imported through Engram's extraction pipeline, with each
 conversation's `created_at` telling the extractor when the data is from — so memory
 content carries real dates. Engram classifies each memory into your group's topics itself;
-the migration never picks a topic, so any topic setup works. `repo_name` is attached only
-when your group configures that property. Note: the `created_at` shown by search is always
+the migration never picks a topic, so any topic setup works. Scope properties resolve per
+source project the same way the store hook resolves them — same configuration files
+(`~/.engram/config.json`, per-dir `.engram.json`), same source cascades — so migrated and
+realtime memories are scoped identically. Note: the `created_at` shown by search is always
 the ingestion time — Weaviate does not allow overriding it.
 
 Useful flags:

@@ -1,11 +1,9 @@
-"""Migration tests. Stdlib-only: a synthetic claude-mem DB stands in for the real store and
-a fake client covers execution — the one test constructing real SDK input types skips when
-the SDK isn't importable (run under the plugin venv for it).
+"""Migration tests. A synthetic claude-mem DB stands in for the real store and a fake
+client covers execution. The SDK is assumed present — run under the plugin venv:
 
-    cd plugin && python3 -m unittest tests.test_migrate -v
+    cd plugin && ~/.claude/plugins/data/engram-*/venv/bin/python -m unittest tests.test_migrate -v
 """
 
-import importlib.util
 import json
 import os
 import sqlite3
@@ -122,8 +120,13 @@ class ClaudeMemAdapterTest(unittest.TestCase):
         con.close()
 
 
-def fake_resolver(mapping):
-    return lambda project: mapping.get(project)
+def fake_props(mapping):
+    """props_for stub: mapping names a repo_name per project; missing → None (skip)."""
+    return lambda project: (
+        {"repo_name": mapping[project], "session_id": "migration:test"}
+        if project in mapping
+        else None
+    )
 
 
 class EngineTest(unittest.TestCase):
@@ -135,33 +138,40 @@ class EngineTest(unittest.TestCase):
             Record("x1", "lost", "2026-06-01T00:00:00Z", "unmapped"),
         ]
 
-    def test_plan_orders_chronologically_and_skips_unmapped(self):
-        resolve = fake_resolver({"alpha": "org/alpha", "beta": "org/beta"})
-        planned = plan_conversations(self.recs(), resolve)
+    def test_plan_orders_chronologically_and_skips_unresolvable(self):
+        props_for = fake_props({"alpha": "org/alpha", "beta": "org/beta"})
+        planned = plan_conversations(self.recs(), props_for)
         # earliest day first; within a day, items sorted by timestamp
         self.assertEqual(
-            [(label, [u for u, _, _ in items]) for label, items in planned["batches"]],
+            [(label, [u for u, _, _ in items]) for label, _, items in planned["batches"]],
             [("org/beta", ["b1"]), ("org/alpha", ["a2", "a1"])],
         )
-        self.assertEqual(planned["batches"][1][1][0], ("a2", "2026-05-06T05:00:00Z", "two"))
+        self.assertEqual(planned["batches"][1][2][0], ("a2", "2026-05-06T05:00:00Z", "two"))
+        # each batch carries the project's resolved scope properties
+        self.assertEqual(planned["batches"][0][1],
+                         {"repo_name": "org/beta", "session_id": "migration:test"})
         self.assertEqual(planned["skipped"], {"unmapped": 1})
         report = render_report(planned, ["src line"], "hdr")
         self.assertIn("unmapped", report)
         self.assertIn("org/alpha", report)
 
-    def test_plan_without_repo_scoping_keeps_unmapped(self):
-        # the group has no repo_name property: nothing can be mis-filed, so unresolvable
-        # projects migrate too, labeled by their project name
-        resolve = fake_resolver({"alpha": "org/alpha", "beta": "org/beta"})
-        planned = plan_conversations(self.recs(), resolve, require_repo=False)
+    def test_plan_labels_by_project_when_no_repo_property(self):
+        # a group without a repo_name property: props resolve without one, nothing skips,
+        # and the batch label falls back to the project name
+        planned = plan_conversations(
+            self.recs(), lambda project: {"session_id": "migration:test"}
+        )
         self.assertEqual(planned["items"], 4)
         self.assertEqual(planned["skipped"], {})
-        self.assertIn(("unmapped", [("x1", "2026-06-01T00:00:00Z", "lost")]),
-                      planned["batches"])
+        self.assertIn(
+            ("unmapped", {"session_id": "migration:test"},
+             [("x1", "2026-06-01T00:00:00Z", "lost")]),
+            planned["batches"],
+        )
 
     def test_plan_skip_uids(self):
-        resolve = fake_resolver({"alpha": "org/alpha", "beta": "org/beta"})
-        planned = plan_conversations(self.recs(), resolve, skip_uids={"a1", "b1"})
+        props_for = fake_props({"alpha": "org/alpha", "beta": "org/beta"})
+        planned = plan_conversations(self.recs(), props_for, skip_uids={"a1", "b1"})
         self.assertEqual(planned["items"], 1)
         self.assertEqual(planned["already"], 2)
 
@@ -171,7 +181,7 @@ class EngineTest(unittest.TestCase):
             Record("a2", "no date", None, "alpha"),
             Record("a3", "garbage date", "not-a-ts", "alpha"),
         ]
-        planned = plan_conversations(recs, fake_resolver({"alpha": "org/alpha"}))
+        planned = plan_conversations(recs, fake_props({"alpha": "org/alpha"}))
         self.assertEqual(planned["items"], 1)
         self.assertEqual(planned["undated"], 2)
         self.assertEqual(planned["project_counts"], {"alpha": 1})
@@ -227,37 +237,35 @@ class EngineTest(unittest.TestCase):
             "r3": SimpleNamespace(status="running", error=None),
         }
         client = SimpleNamespace(runs=SimpleNamespace(get=lambda rid: statuses[rid]))
-        reconcile_pending(cp, client, lambda *_: None)
+        done, failed = reconcile_pending(cp, client, lambda *_: None)
+        self.assertEqual((done, failed), (1, ["r2"]))
         self.assertEqual(cp["done"], {"a1": "r1"})
         self.assertEqual(cp["pending"], {"r3": ["a3"]})  # running stays reserved
 
 
-@unittest.skipUnless(importlib.util.find_spec("engram"), "Engram SDK not installed")
 class ExecuteTest(unittest.TestCase):
     def _client(self, calls):
         def add(inp, user_id=None, properties=None):
             calls.append((len(inp.messages) - 1, user_id, properties))  # minus system msg
             return SimpleNamespace(run_id=f"r{len(calls)}")
 
-        return SimpleNamespace(
-            memories=SimpleNamespace(add=add),
-            runs=SimpleNamespace(
-                wait=lambda rid, timeout, interval: SimpleNamespace(
-                    status="completed", error=None
-                )
-            ),
-        )
+        # no runs attribute: execute must not wait on the pipeline (Engram queues
+        # internally); settle() is the only status reader
+        return SimpleNamespace(memories=SimpleNamespace(add=add))
 
     def _planned(self):
+        props = {"session_id": "migration:claude-mem"}
         return {
             "batches": [
-                ("org/alpha", [("a1", "2026-05-06T05:00:00Z", "one"),
-                               ("a2", "2026-05-06T10:00:00Z", "two")]),
-                ("org/beta", [("b1", "2026-06-01T00:00:00Z", "three")]),
+                ("org/alpha", {"repo_name": "org/alpha", **props},
+                 [("a1", "2026-05-06T05:00:00Z", "one"),
+                  ("a2", "2026-05-06T10:00:00Z", "two")]),
+                ("org/beta", {"repo_name": "org/beta", **props},
+                 [("b1", "2026-06-01T00:00:00Z", "three")]),
             ]
         }
 
-    def test_execute_commits_and_checkpoints(self):
+    def test_execute_submits_all_without_waiting(self):
         from core.migrate.engine import execute
 
         calls = []
@@ -265,29 +273,45 @@ class ExecuteTest(unittest.TestCase):
             cp_path = os.path.join(tmp, "cp.json")
             cp = {"done": {}, "pending": {}}
             result = execute(self._planned(), self._client(calls), "u@x", cp, cp_path,
-                             log=lambda *_: None,
-                             extra_properties={"session_id": "migration:claude-mem"})
-            self.assertEqual(result, {"committed": 2, "failed": [], "pending": 0})
+                             log=lambda *_: None)
+            self.assertEqual(result, {"submitted": 2, "failed": []})
             self.assertEqual(
                 calls,
                 [(2, "u@x", {"repo_name": "org/alpha", "session_id": "migration:claude-mem"}),
                  (1, "u@x", {"repo_name": "org/beta", "session_id": "migration:claude-mem"})],
             )
-            self.assertEqual(load_checkpoint(cp_path)["done"],
-                             {"a1": "r1", "a2": "r1", "b1": "r2"})
+            # every run is pending until settle() confirms it
+            self.assertEqual(load_checkpoint(cp_path)["pending"],
+                             {"r1": ["a1", "a2"], "r2": ["b1"]})
 
-    def test_execute_without_repo_scoping_sends_no_properties(self):
+    def test_execute_sends_no_properties_when_none_resolved(self):
         from core.migrate.engine import execute
 
         calls = []
+        planned = {"batches": [("proj", {}, [("a1", "2026-05-06T05:00:00Z", "one")])]}
         with tempfile.TemporaryDirectory() as tmp:
             cp = {"done": {}, "pending": {}}
-            execute(self._planned(), self._client(calls), "u@x", cp,
-                    os.path.join(tmp, "cp.json"), log=lambda *_: None, attach_repo=False)
-        # the group configures no properties: none are sent, not even repo_name
-        self.assertEqual([props for _, _, props in calls], [None, None])
+            execute(planned, self._client(calls), "u@x", cp,
+                    os.path.join(tmp, "cp.json"), log=lambda *_: None)
+        self.assertEqual([props for _, _, props in calls], [None])
 
-    def test_execute_conversation_builds_input_and_preserves_order(self):
+    def test_execute_stops_on_submit_error(self):
+        from core.migrate.engine import execute
+
+        def add(inp, user_id=None, properties=None):
+            raise RuntimeError("missing required property")
+
+        client = SimpleNamespace(memories=SimpleNamespace(add=add))
+        with tempfile.TemporaryDirectory() as tmp:
+            cp = {"done": {}, "pending": {}}
+            result = execute(self._planned(), client, "u@x", cp,
+                             os.path.join(tmp, "cp.json"), log=lambda *_: None)
+        # the first failed submit stops the loop: later days must not overtake it
+        self.assertEqual(result["submitted"], 0)
+        self.assertEqual(len(result["failed"]), 1)
+        self.assertEqual(cp["pending"], {})
+
+    def test_execute_builds_conversation_input(self):
         from engram import ConversationInput
 
         from core.migrate.engine import execute
@@ -298,35 +322,39 @@ class ExecuteTest(unittest.TestCase):
             submitted.append(inp)
             return SimpleNamespace(run_id=f"r{len(submitted)}")
 
-        # first run never finishes → conversation mode must abort, not skip ahead
-        client = SimpleNamespace(
-            memories=SimpleNamespace(add=add),
-            runs=SimpleNamespace(
-                wait=lambda rid, timeout, interval: SimpleNamespace(
-                    status="running", error=None
-                )
-            ),
-        )
+        client = SimpleNamespace(memories=SimpleNamespace(add=add))
         planned = {
             "batches": [
-                ("org/a", [("a2", "2026-05-06T05:00:00Z", "two"),
-                           ("a1", "2026-05-06T10:00:00Z", "one")]),
-                ("org/b", [("b1", "2026-06-01T00:00:00Z", "three")]),
+                ("org/a", {"repo_name": "org/a"},
+                 [("a2", "2026-05-06T05:00:00Z", "two"),
+                  ("a1", "2026-05-06T10:00:00Z", "one")]),
             ]
         }
         with tempfile.TemporaryDirectory() as tmp:
-            cp = {"done": {}, "pending": {}}
-            result = execute(planned, client, "u@x", cp, os.path.join(tmp, "cp.json"),
-                             wait_timeout=1, log=lambda *_: None)
-        self.assertEqual(len(submitted), 1)  # aborted after the unfinished first run
-        self.assertEqual(result["pending"], 1)
+            execute(planned, client, "u@x", {"done": {}, "pending": {}},
+                    os.path.join(tmp, "cp.json"), log=lambda *_: None)
         inp = submitted[0]
         self.assertIsInstance(inp, ConversationInput)
         self.assertEqual(inp.created_at, "2026-05-06T05:00:00Z")
         self.assertEqual(inp.messages[0].role, "system")
         self.assertEqual([m.content for m in inp.messages[1:]], ["two", "one"])
         self.assertEqual(inp.messages[1].created_at, "2026-05-06T05:00:00Z")
-        self.assertEqual(cp["pending"], {"r1": ["a2", "a1"]})
+
+    def test_settle_confirms_and_releases(self):
+        from core.migrate.engine import settle
+
+        statuses = {
+            "r1": SimpleNamespace(status="completed", error=None),
+            "r2": SimpleNamespace(status="failed", error="boom"),
+        }
+        client = SimpleNamespace(runs=SimpleNamespace(get=lambda rid: statuses[rid]))
+        cp = {"done": {}, "pending": {"r1": ["a1", "a2"], "r2": ["b1"]}}
+        with tempfile.TemporaryDirectory() as tmp:
+            committed, failed = settle(cp, client, os.path.join(tmp, "cp.json"),
+                                       timeout=5, interval=0, log=lambda *_: None)
+        self.assertEqual((committed, failed), (1, ["r2"]))
+        self.assertEqual(cp["done"], {"a1": "r1", "a2": "r1"})
+        self.assertEqual(cp["pending"], {})  # failed run released for resubmission
 
 
 if __name__ == "__main__":
