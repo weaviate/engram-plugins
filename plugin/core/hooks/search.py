@@ -45,8 +45,8 @@ def emit(status=None, memories=None):
     if memories:
         parts.append(
             "Relevant long-term memories about this user (from Engram). Use them if helpful; "
-            "ignore if irrelevant. Briefly mention when Engram memory informs your answer:\n"
-            + memories
+            "ignore if irrelevant. If a memory informs your answer, say so in your first "
+            "sentence and credit Engram:\n" + memories
         )
     if parts:
         print(
