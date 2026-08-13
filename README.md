@@ -24,7 +24,6 @@ Inside Claude Code CLI session do:
 ```bash
 /plugin marketplace add weaviate/engram-plugins
 /plugin install engram@weaviate-engram
-/reload-plugins
 ```
 
 That's it. Memory starts working on your next prompt.
