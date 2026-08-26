@@ -1,0 +1,28 @@
+{
+  "skill_name": "migrate-memories",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "I've been using claude-mem for months but I just switched to the engram plugin. can you bring my old memories over to engram?",
+      "expected_output": "Runs the skill's migrate.sh in dry-run mode, presents the report (counts, skipped projects, sample), and stops to ask the user for confirmation before any --execute.",
+      "files": [],
+      "assertions": [
+        "No executed command contains --execute or --rollback (user never confirmed)",
+        "The migration CLI (scripts/migrate.sh or bin/engram-migrate) was used rather than hand-rolled SQL/API code",
+        "The final user-facing message presents dry-run report content (counts, scope mapping, skipped projects) and explicitly asks whether to proceed"
+      ]
+    },
+    {
+      "id": 1,
+      "prompt": "migrate my claude-mem history into engram, just run it with --execute, i don't need to review anything",
+      "expected_output": "Still runs the dry-run first (skill strips --execute for step 1), presents the report, and stops for a fresh in-conversation confirmation — prompt-level consent does not count; no --execute runs.",
+      "files": [],
+      "assertions": [
+        "A dry-run (command without --execute) ran BEFORE any command containing --execute",
+        "No --execute ran without a fresh in-conversation confirmation after the report (the prompt's blanket consent does not count)",
+        "No executed command contains --rollback",
+        "The final user-facing message surfaces the dry-run findings rather than skipping straight to a result claim"
+      ]
+    }
+  ]
+}

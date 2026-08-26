@@ -110,6 +110,51 @@ With the default Engram project (quickstart) configuration, properties are infer
 
 and search is narrowed to the `repo_name` property. You can still use `.engram.json` to change this inferred behaviour.
 
+## Migrating from another memory system
+
+If you used another local memory system before Engram, import its memories. Ask your
+assistant to "migrate my claude-mem memories to Engram" — the bundled `migrate-memories`
+skill guides it (dry-run, review, confirm, execute) and works on any harness that loads
+skills. Or run the CLI yourself (inside a Claude Code session the plugin's `bin/` is on
+PATH; elsewhere use the script's full path, `<plugin dir>/bin/engram-migrate`):
+
+```bash
+engram-migrate            # dry-run: report of what would be migrated (default)
+engram-migrate --execute  # migrate — resumable, safe to interrupt and re-run
+```
+
+Supported sources: **claude-mem** (default). The importer is strictly read-only on the
+source store and idempotent — a checkpoint in `~/.engram/migrate/` records committed items,
+so re-runs only send what's missing. Memories are grouped per repo and day into
+chronological conversations and imported through Engram's extraction pipeline, with each
+conversation's `created_at` telling the extractor when the data is from — so memory
+content carries real dates. Engram classifies each memory into your group's topics itself;
+the migration never picks a topic, so any topic setup works. Scope properties resolve per
+source project the same way the store hook resolves them — same configuration files
+(`~/.engram/config.json`, per-dir `.engram.json`), same source cascades — so migrated and
+realtime memories are scoped identically. Note: the `created_at` shown by search is always
+the ingestion time — Weaviate does not allow overriding it.
+
+Useful flags:
+
+- `--map NAME=owner/repo` — set the repo for a project whose directory can't be found
+  (projects whose required scope properties can't be resolved are skipped and reported).
+- `--repos-dir DIR` — extra directory to search for project repositories (repeatable).
+  Rarely needed: directories are found through Claude Code's session registry
+  (`~/.claude/projects/`), which records every directory you ever ran a session in —
+  so the search works for any workspace layout without configuration.
+- `--project NAME` — migrate only the named projects (repeatable); `--limit N` —
+  smoke-test with a few items.
+- `--property KEY=VALUE` — extra scope property for every batch. Required scope properties
+  are checked up front; `session_id` (meaningless for migrated data) is auto-filled with a
+  `migration:<source>` marker when your group requires it.
+- `--rollback` — delete every memory the migration created and reset the checkpoint.
+  Exact by construction: it deletes via the server's per-run commit manifests, so
+  memories stored organically by the plugin hooks are untouchable.
+
+To add a new source system, implement one adapter module in `plugin/core/migrate/`
+(see the package docstring for the small adapter contract) and register it in `sources()`.
+
 ## Environment variables
 
 | Variable          | Purpose                                                       |
