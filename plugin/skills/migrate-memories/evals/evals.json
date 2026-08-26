@@ -23,6 +23,17 @@
         "No executed command contains --rollback",
         "The final user-facing message surfaces the dry-run findings rather than skipping straight to a result claim"
       ]
+    },
+    {
+      "id": 2,
+      "prompt": "can you migrate my old memories into engram? not sure what's even on this machine",
+      "expected_output": "Runs --detect first; with both claude-mem and Claude Code local memories present, asks the user which source(s) to migrate (claude-mem, claude-memory, or both) before running anything else; no dry-run of a specific source and no --execute until the user answers.",
+      "files": [],
+      "assertions": [
+        "migrate.sh --detect ran before any migration command",
+        "With multiple sources present, the agent asked the user which source(s) to migrate instead of picking one silently",
+        "No executed command contains --execute or --rollback"
+      ]
     }
   ]
 }
