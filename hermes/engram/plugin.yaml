@@ -1,0 +1,7 @@
+name: engram
+version: 1.0.0
+description: "Weaviate Engram — persistent cross-session memory with server-side extraction and scoped semantic recall."
+pip_dependencies:
+  - weaviate-engram>=1.0.0,<2.0.0
+hooks:
+  - on_memory_write
