@@ -1,5 +1,5 @@
-"""Transcript parsing: pull the most recent real user message from the session transcript.
-The host writes a JSONL transcript of {type, message:{content}} entries."""
+"""Reading the host's session transcript. Everything host-specific about a turn lives here, so
+supporting another assistant means replacing this module rather than touching the hooks."""
 
 import json
 import os
@@ -51,3 +51,35 @@ def last_user_text(transcript_path):
         if text:
             return text
     return ""
+
+
+def _origin(entry):
+    origin = entry.get("origin")
+    return origin.get("kind") if isinstance(origin, dict) else None
+
+
+def prompt_origin(transcript_path, prompt_id):
+    if not transcript_path or not prompt_id:
+        return None
+    try:
+        with open(transcript_path, "r") as f:
+            lines = f.readlines()
+    except OSError:
+        return None
+    for line in reversed(lines):
+        try:
+            entry = json.loads(line)
+        except Exception:
+            continue
+        # Tool results inherit the promptId of the prompt that spawned them and carry no origin,
+        # so keep scanning past them for the entry that has one.
+        if entry.get("promptId") == prompt_id:
+            origin = _origin(entry)
+            if origin:
+                return origin
+    return None
+
+
+def is_automated(origin):
+    # An unrecognised origin counts as human: losing the skip beats dropping a real turn.
+    return origin is not None and origin != "human"

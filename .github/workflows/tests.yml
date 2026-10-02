@@ -1,0 +1,19 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  unittest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          # Matches the floor hooks/ensure_deps.py builds the plugin venv with.
+          python-version: "3.11"
+      - run: pip install -r plugin/requirements.txt
+      - run: python -m unittest discover -s tests -t .
+        working-directory: plugin

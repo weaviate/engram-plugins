@@ -13,6 +13,13 @@ def read_input():
     return json.load(sys.stdin)
 
 
+def debug(event, **fields):
+    if not os.environ.get("ENGRAM_DEBUG"):
+        return
+    detail = " ".join(f"{k}={v}" for k, v in fields.items() if v is not None)
+    sys.stderr.write(f"Engram · {event} {detail}\n")
+
+
 def data_dir():
     """Plugin data dir (the venv, the schema cache, and state flags), provided by the host via
     CLAUDE_PLUGIN_DATA. No fallback on purpose: a guessed path diverges between entry points

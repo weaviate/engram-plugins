@@ -89,12 +89,35 @@ def get_user_id():
     return out.stdout.strip() or None
 
 
-def get_client():
+# The host caps UserPromptSubmit at 30s however long hooks.json asks for, and that hook blocks the
+# prompt, so recall has to finish well inside it. Storing runs asyncRewake, off the critical path.
+# DEFAULT_TIMEOUT matches the SDK's own, for callers not racing a user.
+SEARCH_TIMEOUT = 8.0
+STORE_TIMEOUT = 25.0
+DEFAULT_TIMEOUT = 30.0
+
+
+def _timeout(default):
+    override = _config("ENGRAM_TIMEOUT")
+    if not override:
+        return default
+    try:
+        seconds = float(override)
+    except ValueError:
+        return default
+    # The SDK rejects a non-positive timeout, and get_client runs outside the hooks' try/except.
+    return seconds if seconds > 0 else default
+
+
+def get_client(timeout=DEFAULT_TIMEOUT):
     api_key = engram_api_key()
     if not api_key:
         return None
     return EngramClient(
-        api_key=api_key, base_url=engram_base_url(), headers=client_origin_header()
+        api_key=api_key,
+        base_url=engram_base_url(),
+        headers=client_origin_header(),
+        timeout=_timeout(timeout),
     )
 
 

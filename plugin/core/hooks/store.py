@@ -11,9 +11,13 @@ keeps that wake from looping within a single rewake."""
 import sys
 
 from core import (
+    STORE_TIMEOUT,
+    debug,
     get_client,
     get_user_id,
+    is_automated,
     last_user_text,
+    prompt_origin,
     read_input,
     resolve_scope,
 )
@@ -22,6 +26,16 @@ from core import (
 def main():
     data = read_input()
     if data.get("stop_hook_active"):
+        return 0
+
+    session_id = data.get("session_id", "")
+    prompt_id = data.get("prompt_id", "")
+
+    # Recall still runs for host-generated turns, but their user half is machine markup and the
+    # work they describe is stored with the human turn that follows.
+    origin = prompt_origin(data.get("transcript_path"), prompt_id)
+    if is_automated(origin):
+        debug("store skipped", prompt_id=prompt_id, origin=origin)
         return 0
 
     assistant = (data.get("last_assistant_message") or "").strip()
@@ -35,7 +49,7 @@ def main():
     if not messages:
         return 0
 
-    client = get_client()
+    client = get_client(STORE_TIMEOUT)
     if client is None:
         return 0  # search surfaces a missing key/SDK immediately; nothing to wake about here
 
@@ -44,10 +58,8 @@ def main():
         return 0  # search surfaces missing identity immediately
 
     try:
-        properties, _user_required, _unmapped = resolve_scope(
-            data.get("cwd", ""), data.get("session_id", "")
-        )
-        client.memories.add(messages, user_id=user_id, properties=properties or None)
+        properties, _user_required, _unmapped = resolve_scope(data.get("cwd", ""), session_id)
+        run = client.memories.add(messages, user_id=user_id, properties=properties or None)
     except Exception as e:
         # exit 2 → asyncRewake wakes Claude and shows this stderr as a system reminder
         sys.stderr.write(
@@ -56,6 +68,7 @@ def main():
         )
         return 2
 
+    debug("store", prompt_id=prompt_id, run_id=getattr(run, "run_id", None))
     return 0
 
 

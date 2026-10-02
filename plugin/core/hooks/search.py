@@ -11,6 +11,8 @@ import json
 import sys
 
 from core import (
+    SEARCH_TIMEOUT,
+    debug,
     engram_warning,
     get_client,
     get_user_id,
@@ -73,7 +75,7 @@ def main():
         emit(status=[tag(warning)])
         return 0
 
-    client = get_client()
+    client = get_client(SEARCH_TIMEOUT)
     if client is None:
         emit(status=[tag("client unavailable.")])
         return 0
@@ -100,6 +102,8 @@ def main():
             memories.append(str(content).strip())
 
     bullets = "\n".join(f"- {m}" for m in memories)
+
+    debug("search", prompt_id=data.get("prompt_id"), injected=len(memories), chars=len(bullets))
 
     # Success is silent: warnings (if any) show this reply; memories are injected as context.
     emit(status=[tag(w) for w in warnings] or None, memories=bullets or None)
