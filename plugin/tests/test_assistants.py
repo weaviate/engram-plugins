@@ -11,7 +11,10 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from core.assistants import claude_code, codex  # noqa: E402
+from core.assistants import Assistant, ClaudeCode, Codex  # noqa: E402
+
+CLAUDE_CODE = ClaudeCode()
+CODEX = Codex()
 
 
 def prompt(text, prompt_id, kind="human"):
@@ -51,17 +54,17 @@ class ClaudeCodeTest(TranscriptFixture):
         return {"prompt_id": prompt_id, "transcript_path": path or self.path}
 
     def test_turn_id(self):
-        self.assertEqual(claude_code.turn_id({"prompt_id": "a"}), "a")
-        self.assertEqual(claude_code.turn_id({}), "")
+        self.assertEqual(CLAUDE_CODE.turn_id({"prompt_id": "a"}), "a")
+        self.assertEqual(CLAUDE_CODE.turn_id({}), "")
 
     def test_reads_the_hosts_label(self):
         self.write([prompt("fix the scope config", "a"), prompt("…", "b", "task-notification")])
-        self.assertFalse(claude_code.is_automated(self.payload("a")))
-        self.assertTrue(claude_code.is_automated(self.payload("b")))
+        self.assertFalse(CLAUDE_CODE.is_automated(self.payload("a")))
+        self.assertTrue(CLAUDE_CODE.is_automated(self.payload("b")))
 
     def test_skips_tool_results_sharing_the_prompt_id(self):
         self.write([prompt("fix the scope config", "a"), tool_result("a")])
-        self.assertFalse(claude_code.is_automated(self.payload("a")))
+        self.assertFalse(CLAUDE_CODE.is_automated(self.payload("a")))
 
     def test_unresolvable_origin_is_treated_as_human(self):
         self.write([prompt("hi", "a")])
@@ -71,17 +74,17 @@ class ClaudeCodeTest(TranscriptFixture):
             self.payload("a", os.path.dirname(__file__)),
             {"transcript_path": self.path},
         ):
-            self.assertFalse(claude_code.is_automated(payload), payload)
+            self.assertFalse(CLAUDE_CODE.is_automated(payload), payload)
 
     def test_survives_a_malformed_line(self):
         self.write([prompt("…", "a", "task-notification")])
         with open(self.path, "a") as f:
             f.write("{not json\n")
-        self.assertTrue(claude_code.is_automated(self.payload("a")))
+        self.assertTrue(CLAUDE_CODE.is_automated(self.payload("a")))
 
     def test_last_user_text(self):
         self.write([prompt("fix the scope config", "a")])
-        self.assertEqual(claude_code.last_user_text(self.payload("a")), "fix the scope config")
+        self.assertEqual(CLAUDE_CODE.last_user_text(self.payload("a")), "fix the scope config")
 
 
 def rollout_message(role, text, kind="input_text"):
@@ -93,32 +96,32 @@ def rollout_message(role, text, kind="input_text"):
 
 class CodexTest(TranscriptFixture):
     def test_turn_id_uses_its_own_field(self):
-        self.assertEqual(codex.turn_id({"turn_id": "t1"}), "t1")
-        self.assertEqual(codex.turn_id({"prompt_id": "a"}), "")
+        self.assertEqual(CODEX.turn_id({"turn_id": "t1"}), "t1")
+        self.assertEqual(CODEX.turn_id({"prompt_id": "a"}), "")
 
     def test_every_turn_counts_as_human(self):
         """Codex documents no provenance field, so nothing is skipped."""
-        self.assertFalse(codex.is_automated({"turn_id": "t1"}))
+        self.assertFalse(CODEX.is_automated({"turn_id": "t1"}))
 
     def test_reads_its_own_rollout_shape(self):
         """Codex wraps messages in `payload` and uses input_text blocks, so the Claude Code
         parser returns nothing for it."""
         self.write([rollout_message("user", "fix the scope config")])
         self.assertEqual(
-            codex.last_user_text({"transcript_path": self.path}), "fix the scope config"
+            CODEX.last_user_text({"transcript_path": self.path}), "fix the scope config"
         )
-        self.assertEqual(claude_code.last_user_text({"transcript_path": self.path}), "")
+        self.assertEqual(CLAUDE_CODE.last_user_text({"transcript_path": self.path}), "")
 
     def test_skips_injected_developer_context(self):
         self.write(
             [rollout_message("user", "the real prompt"),
              rollout_message("developer", "injected context nobody typed")]
         )
-        self.assertEqual(codex.last_user_text({"transcript_path": self.path}), "the real prompt")
+        self.assertEqual(CODEX.last_user_text({"transcript_path": self.path}), "the real prompt")
 
     def test_missing_transcript(self):
-        self.assertEqual(codex.last_user_text({}), "")
-        self.assertEqual(codex.last_user_text({"transcript_path": "/nonexistent"}), "")
+        self.assertEqual(CODEX.last_user_text({}), "")
+        self.assertEqual(CODEX.last_user_text({"transcript_path": "/nonexistent"}), "")
 
 
 class EntryPointTest(unittest.TestCase):
@@ -128,13 +131,13 @@ class EntryPointTest(unittest.TestCase):
     def test_store_failure_exit_differs_per_assistant(self):
         """Claude Code turns exit 2 into a wake carrying the reason; Codex reads it as
         "continue the turn", which would feed the error back as an instruction."""
-        self.assertEqual(claude_code.STORE_FAILURE_EXIT, 2)
-        self.assertEqual(codex.STORE_FAILURE_EXIT, 0)
+        self.assertEqual(CLAUDE_CODE.STORE_FAILURE_EXIT, 2)
+        self.assertEqual(CODEX.STORE_FAILURE_EXIT, 0)
 
     def test_every_assistant_has_an_entry_point(self):
         root = os.path.join(os.path.dirname(__file__), "..", "core")
-        for module in (claude_code, codex):
-            name = module.__name__.rsplit(".", 1)[-1]
+        for assistant in (CLAUDE_CODE, CODEX):
+            name = assistant.NAME.replace("-", "_")
             self.assertTrue(os.path.isfile(os.path.join(root, "entry", f"{name}.py")), name)
 
     def test_each_assistant_ships_a_manifest_and_a_hooks_file(self):

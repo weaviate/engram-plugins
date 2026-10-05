@@ -3,9 +3,11 @@ The host writes a JSONL transcript of {type, message:{content}} entries."""
 
 import json
 import os
+from collections.abc import Iterator
+from typing import Any
 
 
-def entries_newest_first(transcript_path):
+def entries_newest_first(transcript_path: str | None) -> Iterator[dict[str, Any]]:
     """Parsed JSONL entries, newest first. Unreadable file or line yields nothing rather than
     raising: a hook must not break a session over a transcript it cannot parse."""
     if not transcript_path:
@@ -43,7 +45,7 @@ def _is_tool_only(content):
     return False
 
 
-def last_user_text(transcript_path):
+def last_user_text(transcript_path: str | None) -> str:
     """Walk the transcript JSONL backwards for the most recent real user message,
     skipping tool-result turns. Handles both {message:{content}} and {content} shapes."""
     if not transcript_path or not os.path.exists(transcript_path):

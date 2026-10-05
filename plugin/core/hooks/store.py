@@ -10,7 +10,9 @@ keeps that wake from looping within a single rewake."""
 
 import sys
 
-from core import (
+from core.assistants import Assistant
+
+from core import (  # noqa: I001 — core re-exports, kept after the typed import
     STORE_TIMEOUT,
     debug,
     get_client,
@@ -20,7 +22,7 @@ from core import (
 )
 
 
-def run(assistant):
+def run(assistant: Assistant) -> int:
     data = read_input()
     if data.get("stop_hook_active"):
         return 0

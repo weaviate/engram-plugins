@@ -12,7 +12,7 @@ import unittest
 import unittest.mock
 from types import SimpleNamespace
 
-from core.assistants import claude_code
+from core.assistants import ClaudeCode
 from core.hooks import store
 
 
@@ -58,7 +58,7 @@ class StoreHookTest(unittest.TestCase):
             "last_assistant_message": "did the thing",
         }
         with unittest.mock.patch.object(sys, "stdin", io.StringIO(json.dumps(payload))):
-            return store.run(claude_code)
+            return store.run(ClaudeCode())
 
     def test_human_turn_is_stored_with_both_halves(self):
         self.assertEqual(self.run_hook([prompt("fix the scope config", "a")]), 0)

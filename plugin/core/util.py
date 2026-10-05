@@ -5,22 +5,23 @@ import json
 import os
 import subprocess
 import sys
+from typing import Any
 
 
-def read_input():
+def read_input() -> dict[str, Any]:
     """Parse the hook payload (JSON on stdin). A malformed payload raises — a hook should
     never run on garbage input."""
     return json.load(sys.stdin)
 
 
-def debug(event, **fields):
+def debug(event: str, **fields: Any) -> None:
     if not os.environ.get("ENGRAM_DEBUG"):
         return
     detail = " ".join(f"{k}={v}" for k, v in fields.items() if v is not None)
     sys.stderr.write(f"Engram · {event} {detail}\n")
 
 
-def data_dir():
+def data_dir() -> str:
     """Plugin data dir (the venv, the schema cache, and state flags), provided by the assistant.
     No guessed path on purpose: it would diverge between entry points and make bugs untraceable,
     so fail loudly if neither variable is set.

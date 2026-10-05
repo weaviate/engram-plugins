@@ -5,10 +5,14 @@ import json
 import os
 import subprocess
 import urllib.request
+from typing import TYPE_CHECKING, Any
 
 from engram import EngramClient
 
 from .client_origin import client_origin_header
+
+if TYPE_CHECKING:
+    from .assistants import Assistant
 
 DEFAULT_BASE = "https://api.engram.weaviate.io"
 
@@ -56,11 +60,11 @@ def _config(env_var):
     return os.environ.get(env_var) or _from_profile(env_var)
 
 
-def engram_api_key():
+def engram_api_key() -> str | None:
     return _config("ENGRAM_API_KEY")
 
 
-def engram_base_url():
+def engram_base_url() -> str:
     # Dev/override only. Env (or profile fallback) → default.
     return (
         os.environ.get("ENGRAM_BASE_URL")
@@ -69,7 +73,7 @@ def engram_base_url():
     )
 
 
-def get_user_id():
+def get_user_id() -> str | None:
     """Stable identity for memory scoping. ENGRAM_USER_ID (env or shell profile), then git email.
     Returns None when neither is set — callers MUST NOT fall back to a shared id like $USER or
     "default": memories are tagged with this id in Engram permanently, so a non-unique id would
@@ -97,7 +101,7 @@ STORE_TIMEOUT = 25.0
 DEFAULT_TIMEOUT = 30.0
 
 
-def _timeout(default):
+def _timeout(default: float) -> float:
     override = _config("ENGRAM_TIMEOUT")
     if not override:
         return default
@@ -109,7 +113,9 @@ def _timeout(default):
     return seconds if seconds > 0 else default
 
 
-def get_client(timeout=DEFAULT_TIMEOUT, assistant=None):
+def get_client(
+    timeout: float = DEFAULT_TIMEOUT, assistant: "Assistant | None" = None
+) -> EngramClient | None:
     api_key = engram_api_key()
     if not api_key:
         return None
@@ -121,7 +127,7 @@ def get_client(timeout=DEFAULT_TIMEOUT, assistant=None):
     )
 
 
-def engram_warning():
+def engram_warning() -> str | None:
     """Plain-text reason the plugin can't reach Engram, or None if it looks usable. The search
     hook prefixes it and surfaces it through the UserPromptSubmit directive."""
     if not engram_api_key():
@@ -131,7 +137,7 @@ def engram_warning():
     return None
 
 
-def engram_get(path):
+def engram_get(path: str) -> Any:
     """GET a JSON path from the Engram REST API and return the parsed JSON. Raises on any HTTP
     or network error — the caller resolving scope lets it propagate so the operation fails as a
     whole instead of continuing with a half-resolved scope."""

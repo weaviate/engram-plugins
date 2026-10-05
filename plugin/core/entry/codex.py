@@ -1,7 +1,7 @@
 import sys
 
-from ..assistants import codex
+from ..assistants import Codex
 from . import main
 
 if __name__ == "__main__":
-    sys.exit(main(codex, sys.argv))
+    sys.exit(main(Codex(), sys.argv))

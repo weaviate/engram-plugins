@@ -9,7 +9,9 @@ reply and persist by being re-injected each turn, so a fixed problem stops showi
 
 import json
 
-from core import (
+from core.assistants import Assistant
+
+from core import (  # noqa: I001 — core re-exports, kept after the typed import
     SEARCH_TIMEOUT,
     debug,
     engram_warning,
@@ -62,7 +64,7 @@ def emit(status=None, memories=None):
         )
 
 
-def run(assistant):
+def run(assistant: Assistant) -> int:
     data = read_input()
     prompt = (data.get("prompt") or "").strip()
     if not prompt:
