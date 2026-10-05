@@ -93,29 +93,27 @@ def get_user_id() -> str | None:
     return out.stdout.strip() or None
 
 
-# The host caps UserPromptSubmit at 30s however long hooks.json asks for, and that hook blocks the
-# prompt, so recall has to finish well inside it. Storing runs asyncRewake, off the critical path.
-# DEFAULT_TIMEOUT matches the SDK's own, for callers not racing a user.
-SEARCH_TIMEOUT = 8.0
-STORE_TIMEOUT = 25.0
-DEFAULT_TIMEOUT = 30.0
+# One value, because every call is a single quick request: the SDK applies this per HTTP request,
+# and memories.add returns a run id as soon as the server accepts the work rather than waiting for
+# the pipeline. Measured round trips are under a second, so this is a ceiling for a slow network,
+# not a budget. It also stays well inside the 30s the host caps UserPromptSubmit at, leaving room
+# for the venv build on a cold first prompt.
+DEFAULT_TIMEOUT = 10.0
 
 
-def _timeout(default: float) -> float:
+def _timeout() -> float:
     override = _config("ENGRAM_TIMEOUT")
     if not override:
-        return default
+        return DEFAULT_TIMEOUT
     try:
         seconds = float(override)
     except ValueError:
-        return default
+        return DEFAULT_TIMEOUT
     # The SDK rejects a non-positive timeout, and get_client runs outside the hooks' try/except.
-    return seconds if seconds > 0 else default
+    return seconds if seconds > 0 else DEFAULT_TIMEOUT
 
 
-def get_client(
-    timeout: float = DEFAULT_TIMEOUT, assistant: "Assistant | None" = None
-) -> EngramClient | None:
+def get_client(assistant: "Assistant | None" = None) -> EngramClient | None:
     api_key = engram_api_key()
     if not api_key:
         return None
@@ -123,7 +121,7 @@ def get_client(
         api_key=api_key,
         base_url=engram_base_url(),
         headers=client_origin_header(assistant),
-        timeout=_timeout(timeout),
+        timeout=_timeout(),
     )
 
 

@@ -12,7 +12,6 @@ import json
 from core.assistants import Assistant
 
 from core import (  # noqa: I001 — core re-exports, kept after the typed import
-    SEARCH_TIMEOUT,
     debug,
     engram_warning,
     get_client,
@@ -77,7 +76,7 @@ def run(assistant: Assistant) -> int:
         emit(status=[tag(warning)])
         return 0
 
-    client = get_client(SEARCH_TIMEOUT, assistant)
+    client = get_client(assistant)
     if client is None:
         emit(status=[tag("client unavailable.")])
         return 0

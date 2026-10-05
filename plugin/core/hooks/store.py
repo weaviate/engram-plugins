@@ -13,7 +13,6 @@ import sys
 from core.assistants import Assistant
 
 from core import (  # noqa: I001 — core re-exports, kept after the typed import
-    STORE_TIMEOUT,
     debug,
     get_client,
     get_user_id,
@@ -47,7 +46,7 @@ def run(assistant: Assistant) -> int:
     if not messages:
         return 0
 
-    client = get_client(STORE_TIMEOUT, assistant)
+    client = get_client(assistant)
     if client is None:
         debug("store unavailable", turn=turn, reason="no api key")
         return 0  # search surfaces a missing key/SDK immediately; nothing to wake about here

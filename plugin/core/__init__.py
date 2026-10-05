@@ -4,8 +4,6 @@ Hosts differ only in their plugin manifest; the hook entrypoints in core.hooks s
 host's stdin/stdout protocol."""
 
 from .client import (
-    SEARCH_TIMEOUT,
-    STORE_TIMEOUT,
     engram_api_key,
     engram_base_url,
     engram_get,
@@ -19,8 +17,6 @@ from .search import search_filters
 from .util import data_dir, debug, read_input
 
 __all__ = [
-    "SEARCH_TIMEOUT",
-    "STORE_TIMEOUT",
     "engram_api_key",
     "engram_base_url",
     "engram_get",
