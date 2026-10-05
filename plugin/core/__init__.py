@@ -16,7 +16,6 @@ from .client import (
 from .config import load_config, user_config_path
 from .scope import resolve_scope, scope_schema
 from .search import search_filters
-from .transcript import is_automated, last_user_text, prompt_origin
 from .util import data_dir, debug, read_input
 
 __all__ = [
@@ -33,9 +32,6 @@ __all__ = [
     "resolve_scope",
     "scope_schema",
     "search_filters",
-    "is_automated",
-    "last_user_text",
-    "prompt_origin",
     "data_dir",
     "debug",
     "read_input",

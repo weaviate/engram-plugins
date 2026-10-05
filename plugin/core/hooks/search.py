@@ -8,7 +8,6 @@ Stateless — no per-session files. Success is silent. Warnings/errors are scope
 reply and persist by being re-injected each turn, so a fixed problem stops showing on its own."""
 
 import json
-import sys
 
 from core import (
     SEARCH_TIMEOUT,
@@ -63,7 +62,7 @@ def emit(status=None, memories=None):
         )
 
 
-def main():
+def run(assistant):
     data = read_input()
     prompt = (data.get("prompt") or "").strip()
     if not prompt:
@@ -72,10 +71,11 @@ def main():
 
     warning = engram_warning()
     if warning:
+        debug("search unavailable", turn=assistant.turn_id(data), reason=warning)
         emit(status=[tag(warning)])
         return 0
 
-    client = get_client(SEARCH_TIMEOUT)
+    client = get_client(SEARCH_TIMEOUT, assistant)
     if client is None:
         emit(status=[tag("client unavailable.")])
         return 0
@@ -90,6 +90,7 @@ def main():
             query=prompt, user_id=user_id, topics=topics, **kwargs
         )
     except Exception as e:
+        debug("search failed", turn=assistant.turn_id(data), error=e)
         emit(status=[tag(f"search failed: {e}")])
         return 0
 
@@ -103,12 +104,8 @@ def main():
 
     bullets = "\n".join(f"- {m}" for m in memories)
 
-    debug("search", prompt_id=data.get("prompt_id"), injected=len(memories), chars=len(bullets))
+    debug("search", turn=assistant.turn_id(data), injected=len(memories), chars=len(bullets))
 
     # Success is silent: warnings (if any) show this reply; memories are injected as context.
     emit(status=[tag(w) for w in warnings] or None, memories=bullets or None)
     return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())

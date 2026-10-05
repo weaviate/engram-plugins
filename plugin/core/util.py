@@ -21,12 +21,15 @@ def debug(event, **fields):
 
 
 def data_dir():
-    """Plugin data dir (the venv, the schema cache, and state flags), provided by the host via
-    CLAUDE_PLUGIN_DATA. No fallback on purpose: a guessed path diverges between entry points
-    (hooks vs the setup command) and makes bugs untraceable, so fail loudly if it's not set."""
-    d = os.environ.get("CLAUDE_PLUGIN_DATA")
+    """Plugin data dir (the venv, the schema cache, and state flags), provided by the assistant.
+    No guessed path on purpose: it would diverge between entry points and make bugs untraceable,
+    so fail loudly if neither variable is set.
+
+    The specific name is read first. Codex sets PLUGIN_DATA and aliases CLAUDE_PLUGIN_DATA to it,
+    so preferring the generic one would let a stray PLUGIN_DATA override the real value."""
+    d = os.environ.get("CLAUDE_PLUGIN_DATA") or os.environ.get("PLUGIN_DATA")
     if not d:
-        raise RuntimeError("CLAUDE_PLUGIN_DATA not set — the host provides the plugin data dir")
+        raise RuntimeError("neither CLAUDE_PLUGIN_DATA nor PLUGIN_DATA is set")
     return d
 
 

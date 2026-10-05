@@ -3,12 +3,13 @@
 # dir), which carries only the third-party Engram SDK. The core package ships inside
 # this plugin dir, so we add the plugin root to PYTHONPATH to import it. Falls back to system
 # python3 until the venv is built. stdin is passed through.
-# ROOT and DATA are host-provided (CLAUDE_PLUGIN_ROOT/DATA) — no derivation, no fallback, so a
-# misconfigured run fails loudly instead of guessing a path.
-ROOT="${CLAUDE_PLUGIN_ROOT:-}"
-DATA="${CLAUDE_PLUGIN_DATA:-}"
+# ROOT and DATA are assistant-provided — no derivation, so a misconfigured run fails loudly
+# instead of guessing a path. The specific names come first: Codex sets PLUGIN_ROOT/DATA and
+# aliases the CLAUDE_ ones to them, so a stray PLUGIN_ROOT must not win on Claude Code.
+ROOT="${CLAUDE_PLUGIN_ROOT:-${PLUGIN_ROOT:-}}"
+DATA="${CLAUDE_PLUGIN_DATA:-${PLUGIN_DATA:-}}"
 if [ -z "$ROOT" ] || [ -z "$DATA" ]; then
-  echo "Engram · CLAUDE_PLUGIN_ROOT / CLAUDE_PLUGIN_DATA not set" >&2
+  echo "Engram · plugin root / data dir not set" >&2
   exit 1
 fi
 PY="$DATA/venv/bin/python"

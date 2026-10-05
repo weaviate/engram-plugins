@@ -15,62 +15,57 @@ from core import (
     debug,
     get_client,
     get_user_id,
-    is_automated,
-    last_user_text,
-    prompt_origin,
     read_input,
     resolve_scope,
 )
 
 
-def main():
+def run(assistant):
     data = read_input()
     if data.get("stop_hook_active"):
         return 0
 
     session_id = data.get("session_id", "")
-    prompt_id = data.get("prompt_id", "")
+    turn = assistant.turn_id(data)
 
     # Recall still runs for host-generated turns, but their user half is machine markup and the
     # work they describe is stored with the human turn that follows.
-    origin = prompt_origin(data.get("transcript_path"), prompt_id)
-    if is_automated(origin):
-        debug("store skipped", prompt_id=prompt_id, origin=origin)
+    if assistant.is_automated(data):
+        debug("store skipped", turn=turn, assistant=assistant.NAME)
         return 0
 
-    assistant = (data.get("last_assistant_message") or "").strip()
-    user = last_user_text(data.get("transcript_path"))
+    answer = (data.get("last_assistant_message") or "").strip()
+    user = assistant.last_user_text(data)
 
     messages = []
     if user:
         messages.append({"role": "user", "content": user})
-    if assistant:
-        messages.append({"role": "assistant", "content": assistant})
+    if answer:
+        messages.append({"role": "assistant", "content": answer})
     if not messages:
         return 0
 
-    client = get_client(STORE_TIMEOUT)
+    client = get_client(STORE_TIMEOUT, assistant)
     if client is None:
+        debug("store unavailable", turn=turn, reason="no api key")
         return 0  # search surfaces a missing key/SDK immediately; nothing to wake about here
 
     user_id = get_user_id()
     if not user_id:
+        debug("store unavailable", turn=turn, reason="no identity")
         return 0  # search surfaces missing identity immediately
 
     try:
         properties, _user_required, _unmapped = resolve_scope(data.get("cwd", ""), session_id)
-        run = client.memories.add(messages, user_id=user_id, properties=properties or None)
+        added = client.memories.add(messages, user_id=user_id, properties=properties or None)
     except Exception as e:
-        # exit 2 → asyncRewake wakes Claude and shows this stderr as a system reminder
+        # Claude Code turns this exit code into a wake showing the stderr below; Codex would
+        # read the same code as "keep working", so each assistant names its own.
         sys.stderr.write(
             f"Engram · saving memory failed — {e}. Storing is broken until fixed "
             "(check ENGRAM_API_KEY and .engram.json scope).\n"
         )
-        return 2
+        return assistant.STORE_FAILURE_EXIT
 
-    debug("store", prompt_id=prompt_id, run_id=getattr(run, "run_id", None))
+    debug("store", turn=turn, run_id=getattr(added, "run_id", None))
     return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())
