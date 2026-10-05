@@ -1,4 +1,3 @@
-from ..transcript import entries_newest_first
 from .base import Assistant, Payload
 
 
@@ -12,7 +11,7 @@ class Codex(Assistant):
     def last_user_text(self, payload: Payload) -> str:
         """Rollout entries wrap a message in `payload`, and use a `developer` role for injected
         context nobody typed."""
-        for entry in entries_newest_first(payload.get("transcript_path")):
+        for entry in self.transcript(payload):
             message = entry.get("payload") or {}
             if message.get("type") != "message" or message.get("role") != "user":
                 continue

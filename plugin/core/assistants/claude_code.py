@@ -1,4 +1,5 @@
-from ..transcript import entries_newest_first, last_user_text
+from typing import Any
+
 from .base import Assistant, Payload
 
 
@@ -11,17 +12,27 @@ class ClaudeCode(Assistant):
         return payload.get("prompt_id") or ""
 
     def last_user_text(self, payload: Payload) -> str:
-        return last_user_text(payload.get("transcript_path"))
+        for entry in self.transcript(payload):
+            if entry.get("type") != "user":
+                continue
+            content = entry.get("message", entry).get("content")
+            if _is_tool_only(content):
+                continue
+            text = _text(content)
+            if text:
+                return text
+        return ""
 
     def is_automated(self, payload: Payload) -> bool:
         # An unrecognised origin counts as human.
-        origin = self._origin(payload.get("transcript_path"), self.turn_id(payload))
+        origin = self._origin(payload)
         return origin is not None and origin != "human"
 
-    def _origin(self, transcript_path: str | None, prompt_id: str) -> str | None:
+    def _origin(self, payload: Payload) -> str | None:
+        prompt_id = self.turn_id(payload)
         if not prompt_id:
             return None
-        for entry in entries_newest_first(transcript_path):
+        for entry in self.transcript(payload):
             # Tool results inherit the promptId of the prompt that spawned them and carry no
             # origin, so keep scanning past them for the entry that has one.
             if entry.get("promptId") == prompt_id:
@@ -30,3 +41,24 @@ class ClaudeCode(Assistant):
                 if kind:
                     return str(kind)
         return None
+
+
+def _text(content: Any) -> str:
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        parts = [
+            block.get("text", "")
+            for block in content
+            if isinstance(block, dict) and block.get("type") == "text"
+        ]
+        return "\n".join(p for p in parts if p).strip()
+    return ""
+
+
+def _is_tool_only(content: Any) -> bool:
+    """True for entries carrying only tool_use / tool_result blocks."""
+    if isinstance(content, list):
+        types = {b.get("type") for b in content if isinstance(b, dict)}
+        return bool(types) and types.issubset({"tool_result", "tool_use"})
+    return False

@@ -1,9 +1,26 @@
 """What every assistant has to answer for the hooks to work."""
 
+import json
+import os
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
+from functools import lru_cache
 from typing import Any
 
 Payload = dict[str, Any]
+
+
+@lru_cache(maxsize=2)
+def _lines(transcript_path: str, mtime: int, size: int) -> tuple[str, ...]:
+    """Cached on the file's identity so a rewritten transcript is re-read. A turn walks the
+    transcript more than once, and these files reach tens of megabytes.
+
+    Module-level rather than a method: an lru_cache on a method keeps the instance alive."""
+    try:
+        with open(transcript_path, "r") as f:
+            return tuple(f)
+    except OSError:
+        return ()
 
 
 class Assistant(ABC):
@@ -26,3 +43,20 @@ class Assistant(ABC):
         """Whether the assistant started this turn rather than a person. An assistant that
         records no provenance keeps this default: losing the skip beats dropping a real turn."""
         return False
+
+    def transcript(self, payload: Payload) -> Iterator[Payload]:
+        """Transcript entries, newest first. Both assistants write JSONL; one that doesn't can
+        override this. An unreadable file or line yields nothing rather than raising, because a
+        hook must not break a session over a transcript it cannot parse."""
+        path = payload.get("transcript_path")
+        if not path:
+            return
+        try:
+            stat = os.stat(path)
+        except OSError:
+            return
+        for line in reversed(_lines(path, stat.st_mtime_ns, stat.st_size)):
+            try:
+                yield json.loads(line)
+            except Exception:
+                continue
