@@ -82,6 +82,19 @@ class ClaudeCodeTest(TranscriptFixture):
             f.write("{not json\n")
         self.assertTrue(CLAUDE_CODE.is_automated(self.payload("a")))
 
+    def test_an_assistant_can_move_the_transcript_without_reimplementing_the_walk(self):
+        """The payload key is the assistant's to name, so changing it must not force a copy of
+        the JSONL reader."""
+
+        class Elsewhere(ClaudeCode):
+            def transcript_path(self, payload):
+                return payload.get("rollout")
+
+        self.write([prompt("fix the scope config", "a")])
+        self.assertEqual(
+            Elsewhere().last_user_text({"rollout": self.path}), "fix the scope config"
+        )
+
     def test_last_user_text(self):
         self.write([prompt("fix the scope config", "a")])
         self.assertEqual(CLAUDE_CODE.last_user_text(self.payload("a")), "fix the scope config")

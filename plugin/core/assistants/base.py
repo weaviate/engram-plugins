@@ -44,11 +44,17 @@ class Assistant(ABC):
         records no provenance keeps this default: losing the skip beats dropping a real turn."""
         return False
 
+    def transcript_path(self, payload: Payload) -> str | None:
+        """Where this assistant says its transcript is. Claude Code and Codex both document
+        `transcript_path` among the fields every hook receives — unlike the turn id, which each
+        spells differently — so this is the agreed name until one disagrees."""
+        return payload.get("transcript_path")
+
     def transcript(self, payload: Payload) -> Iterator[Payload]:
         """Transcript entries, newest first. Both assistants write JSONL; one that doesn't can
         override this. An unreadable file or line yields nothing rather than raising, because a
         hook must not break a session over a transcript it cannot parse."""
-        path = payload.get("transcript_path")
+        path = self.transcript_path(payload)
         if not path:
             return
         try:
