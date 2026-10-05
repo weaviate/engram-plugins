@@ -123,6 +123,14 @@ class CodexTest(TranscriptFixture):
         self.assertEqual(CODEX.last_user_text({}), "")
         self.assertEqual(CODEX.last_user_text({"transcript_path": "/nonexistent"}), "")
 
+    def test_a_rewritten_transcript_is_re_read(self):
+        """The file read is cached because a hook walks it more than once per turn, so the cache
+        has to notice the same path holding different content."""
+        self.write([rollout_message("user", "first")])
+        self.assertEqual(CODEX.last_user_text({"transcript_path": self.path}), "first")
+        self.write([rollout_message("user", "second")])
+        self.assertEqual(CODEX.last_user_text({"transcript_path": self.path}), "second")
+
 
 class EntryPointTest(unittest.TestCase):
     """Each assistant gets its own entry module naming itself, so nothing resolves an assistant
