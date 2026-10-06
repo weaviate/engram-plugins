@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Run a Python module under the plugin's own venv (built by ensure_deps.py into the plugin data
-# dir), which carries only the third-party Engram SDK. The core package ships inside
-# this plugin dir, so we add the plugin root to PYTHONPATH to import it. Falls back to system
-# python3 until the venv is built. stdin is passed through.
+# dir), which carries only the third-party Engram SDK. The plugin's own packages — core,
+# assistants, entry — ship inside this dir, so we add the plugin root to PYTHONPATH to import
+# them. Falls back to system python3 until the venv is built. stdin is passed through.
 # ROOT and DATA are assistant-provided — no derivation, so a misconfigured run fails loudly
 # instead of guessing a path. The specific names come first: Codex sets PLUGIN_ROOT/DATA and
 # aliases the CLAUDE_ ones to them, so a stray PLUGIN_ROOT must not win on Claude Code.
