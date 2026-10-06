@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run a Python module under the plugin's own venv (built by ensure_deps.py into the plugin data
 # dir), which carries only the third-party Engram SDK. The plugin's packages ship inside
-# this dir, so we add the plugin root to PYTHONPATH to import it. Falls back to system
+# this plugin dir, so we add the plugin root to PYTHONPATH to import it. Falls back to system
 # python3 until the venv is built. stdin is passed through.
 # ROOT and DATA are host-provided (CLAUDE_PLUGIN_ROOT/DATA) — no derivation, no fallback, so a
 # misconfigured run fails loudly instead of guessing a path.

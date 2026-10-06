@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Stop hook: store the completed turn — user message and the assistant's answer — in Engram as
-an OpenAI-format conversation.
+"""Stop hook: store the completed turn — user message + assistant's answer — in
+Engram as an OpenAI-format conversation.
 
 Success is silent. A store failure writes to stderr and exits with the assistant's own
 STORE_FAILURE_EXIT, because the same code means opposite things: Claude Code wakes and reports
@@ -60,8 +60,6 @@ def run(assistant: Assistant) -> int:
         )
         added = client.memories.add(messages, user_id=user_id, properties=properties or None)
     except Exception as e:
-        # Claude Code turns this exit code into a wake showing the stderr below; Codex would
-        # read the same code as "keep working", so each assistant names its own.
         sys.stderr.write(
             f"Engram · saving memory failed — {e}. Storing is broken until fixed "
             "(check ENGRAM_API_KEY and .engram.json scope).\n"

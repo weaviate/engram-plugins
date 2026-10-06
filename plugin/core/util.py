@@ -8,7 +8,7 @@ import sys
 from typing import Any
 
 
-def read_input() -> dict[str, Any]:
+def read_input():
     """Parse the hook payload (JSON on stdin). A malformed payload raises — a hook should
     never run on garbage input."""
     return json.load(sys.stdin)
