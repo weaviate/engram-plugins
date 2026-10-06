@@ -12,10 +12,9 @@ Payload = dict[str, Any]
 
 @lru_cache(maxsize=2)
 def _lines(transcript_path: str, mtime: int, size: int) -> tuple[str, ...]:
-    """Cached on the file's identity so a rewritten transcript is re-read. A turn walks the
-    transcript more than once, and these files reach tens of megabytes.
-
-    Module-level rather than a method: an lru_cache on a method keeps the instance alive."""
+    """Keyed on the file's identity so a rewritten transcript is re-read. A turn walks the
+    transcript more than once and these files reach tens of megabytes. Module-level because an
+    lru_cache on a method would keep the instance alive."""
     try:
         with open(transcript_path, "r") as f:
             return tuple(f)
@@ -33,7 +32,7 @@ class Assistant(ABC):
 
     @abstractmethod
     def turn_id(self, payload: Payload) -> str:
-        """The assistant's own identifier for this turn, used to correlate the debug lines."""
+        """This assistant's own identifier for the turn."""
 
     @abstractmethod
     def last_user_text(self, payload: Payload) -> str:

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """UserPromptSubmit hook: search Engram for memories relevant to the prompt and inject them as
 additionalContext for the assistant to use. Recalled memories are injected silently as context;
 warnings/errors ride in the model's reply (additionalContext directive), not a hook

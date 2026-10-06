@@ -94,8 +94,8 @@ def get_user_id() -> str | None:
 # One value, because every call is a single quick request: the SDK applies this per HTTP request,
 # and memories.add returns a run id as soon as the server accepts the work rather than waiting for
 # the pipeline. Measured round trips are under a second, so this is a ceiling for a slow network,
-# not a budget. It also stays well inside the 30s the host caps UserPromptSubmit at, leaving room
-# for the venv build on a cold first prompt.
+# not a budget. It also stays well inside the 30s Claude Code caps UserPromptSubmit at, leaving
+# room for the venv build on a cold first prompt.
 DEFAULT_TIMEOUT = 10.0
 
 

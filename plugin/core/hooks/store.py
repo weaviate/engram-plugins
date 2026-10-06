@@ -1,12 +1,11 @@
-#!/usr/bin/env python3
-"""Stop hook (asyncRewake): store the completed turn — user message + assistant's answer — in
-Engram as an OpenAI-format conversation.
+"""Stop hook: store the completed turn — user message and the assistant's answer — in Engram as
+an OpenAI-format conversation.
 
-Success is silent. On a store *failure* we exit 2: with asyncRewake the harness wakes Claude and
-shows our stderr as a system reminder, so it can tell the user immediately — no waiting, no
-deferred/stale message. A persistent failure wakes every turn (the search hook surfaces the same
-root cause every turn anyway); fixing the cause silences it. The stop_hook_active guard below
-keeps that wake from looping within a single rewake."""
+Success is silent. A store failure writes to stderr and exits with the assistant's own
+STORE_FAILURE_EXIT, because the same code means opposite things: Claude Code wakes and reports
+it, Codex would take it as instruction to keep working. Where it does wake, a persistent failure
+wakes every turn and fixing the cause silences it; the stop_hook_active guard keeps one wake from
+looping."""
 
 import sys
 
@@ -28,8 +27,8 @@ def run(assistant: Assistant) -> int:
     session_id = data.get("session_id", "")
     turn = assistant.turn_id(data)
 
-    # Recall still runs for host-generated turns, but their user half is machine markup and the
-    # work they describe is stored with the human turn that follows.
+    # Recall still runs for these turns, but the user half is machine markup and the work they
+    # describe is stored with the human turn that follows.
     if assistant.is_automated(data):
         debug("store skipped", turn=turn, assistant=assistant.NAME)
         return 0
