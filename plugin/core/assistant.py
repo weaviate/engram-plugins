@@ -16,7 +16,7 @@ def _lines(transcript_path: str, mtime: int, size: int) -> tuple[str, ...]:
     transcript more than once and these files reach tens of megabytes. Module-level because an
     lru_cache on a method would keep the instance alive."""
     try:
-        with open(transcript_path, "r") as f:
+        with open(transcript_path, "r", errors="replace") as f:
             return tuple(f)
     except OSError:
         return ()

@@ -140,6 +140,14 @@ class CodexTest(TranscriptFixture):
         self.assertEqual(CODEX.last_user_text({}), "")
         self.assertEqual(CODEX.last_user_text({"transcript_path": "/nonexistent"}), "")
 
+    def test_survives_invalid_utf8(self):
+        """A transcript read while it is being written can split a UTF-8 sequence. The bad line
+        is lost to the json guard; the rest of the file still reads."""
+        good = json.dumps(rollout_message("user", "survived")).encode()
+        with open(self.path, "wb") as f:
+            f.write(b"\xff\xfe broken\n" + good + b"\n")
+        self.assertEqual(CODEX.last_user_text({"transcript_path": self.path}), "survived")
+
     def test_a_rewritten_transcript_is_re_read(self):
         """The file read is cached because a hook walks it more than once per turn, so the cache
         has to notice the same path holding different content."""

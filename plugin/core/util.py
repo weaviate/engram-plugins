@@ -9,9 +9,12 @@ from typing import Any
 
 
 def read_input() -> dict[str, Any]:
-    """Parse the hook payload (JSON on stdin). A malformed payload raises — a hook should
-    never run on garbage input."""
-    return json.load(sys.stdin)
+    """Parse the hook payload (a JSON object on stdin). A malformed payload raises — a hook
+    should never run on garbage input."""
+    data = json.load(sys.stdin)
+    if not isinstance(data, dict):
+        raise TypeError(f"hook payload must be a JSON object, got {type(data).__name__}")
+    return data
 
 
 def debug(event: str, **fields: Any) -> None:
