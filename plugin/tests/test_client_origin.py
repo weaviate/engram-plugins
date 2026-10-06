@@ -42,3 +42,7 @@ class HeaderTest(unittest.TestCase):
 
     def test_missing_manifest(self):
         self.assertEqual(client_origin._plugin_version(".nonexistent-plugin"), "unknown")
+
+
+if __name__ == "__main__":
+    unittest.main()

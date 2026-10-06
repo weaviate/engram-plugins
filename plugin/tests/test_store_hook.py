@@ -12,8 +12,10 @@ import unittest
 import unittest.mock
 from types import SimpleNamespace
 
-from assistants import ClaudeCode
-from core.hooks import store
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+from assistants import ClaudeCode  # noqa: E402
+from core.hooks import store  # noqa: E402
 
 
 def prompt(text, prompt_id, kind="human"):
