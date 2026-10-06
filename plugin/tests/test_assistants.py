@@ -11,11 +11,14 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+import assistants  # noqa: E402
 from assistants import ClaudeCode, Codex  # noqa: E402
 from core.assistant import Assistant  # noqa: E402
 
 CLAUDE_CODE = ClaudeCode()
 CODEX = Codex()
+# Derived from the package so a newly registered assistant has to satisfy the checks below.
+EVERY_ASSISTANT = [getattr(assistants, name)() for name in assistants.__all__]
 
 
 def prompt(text, prompt_id, kind="human"):
@@ -58,7 +61,7 @@ class ClaudeCodeTest(TranscriptFixture):
         self.assertEqual(CLAUDE_CODE.turn_id({"prompt_id": "a"}), "a")
         self.assertEqual(CLAUDE_CODE.turn_id({}), "")
 
-    def test_reads_the_hosts_label(self):
+    def test_reads_the_assistants_label(self):
         self.write([prompt("fix the scope config", "a"), prompt("…", "b", "task-notification")])
         self.assertFalse(CLAUDE_CODE.is_automated(self.payload("a")))
         self.assertTrue(CLAUDE_CODE.is_automated(self.payload("b")))
@@ -156,19 +159,28 @@ class EntryPointTest(unittest.TestCase):
         self.assertEqual(CLAUDE_CODE.STORE_FAILURE_EXIT, 2)
         self.assertEqual(CODEX.STORE_FAILURE_EXIT, 0)
 
-    def test_every_assistant_has_an_entry_point(self):
-        root = os.path.join(os.path.dirname(__file__), "..")
-        for assistant in (CLAUDE_CODE, CODEX):
-            name = assistant.NAME.replace("-", "_")
-            self.assertTrue(os.path.isfile(os.path.join(root, "entry", f"{name}.py")), name)
+    def test_the_contract_refuses_an_incomplete_assistant(self):
+        """The point of the base class: a missing method fails at instantiation rather than at
+        the first turn that needs it."""
 
-    def test_each_assistant_ships_a_manifest_and_a_hooks_file(self):
-        """No hooks/hooks.json: Claude Code merges the default into whatever the manifest names,
-        so a shared default would leak one assistant's entry point into the other's session."""
+        class Incomplete(Assistant):
+            NAME = "incomplete"
+
+        with self.assertRaises(TypeError):
+            Incomplete()
+
+    def test_every_assistant_is_wired_end_to_end(self):
+        """Each registered assistant needs an entry module, a manifest naming its own hooks file,
+        and commands in that file invoking its entry module. No hooks/hooks.json: Claude Code
+        merges the default into whatever the manifest names, so a shared default would leak one
+        assistant's entry point into the other's session."""
         root = os.path.join(os.path.dirname(__file__), "..")
         self.assertFalse(os.path.exists(os.path.join(root, "hooks", "hooks.json")))
-        for manifest_dir, entry in ((".claude-plugin", "claude_code"), (".codex-plugin", "codex")):
-            with open(os.path.join(root, manifest_dir, "plugin.json")) as f:
+        for assistant in EVERY_ASSISTANT:
+            entry = assistant.NAME.replace("-", "_")
+            self.assertTrue(os.path.isfile(os.path.join(root, "entry", f"{entry}.py")), entry)
+
+            with open(os.path.join(root, assistant.MANIFEST_DIR, "plugin.json")) as f:
                 manifest = json.load(f)
             hooks_path = manifest["hooks"]
             self.assertTrue(hooks_path.startswith("./"), hooks_path)
@@ -180,9 +192,19 @@ class EntryPointTest(unittest.TestCase):
                 for group in event
                 for hook in group["hooks"]
             ]
-            self.assertTrue(commands, manifest_dir)
+            self.assertTrue(commands, assistant.NAME)
             for command in commands:
                 self.assertIn(f"-m entry.{entry} ", command)
+
+    def test_the_manifests_agree_on_the_version(self):
+        """One plugin shipped to several assistants. Nothing else keeps these in step, and the
+        client header reports whichever manifest its own assistant names."""
+        root = os.path.join(os.path.dirname(__file__), "..")
+        versions = set()
+        for assistant in EVERY_ASSISTANT:
+            with open(os.path.join(root, assistant.MANIFEST_DIR, "plugin.json")) as f:
+                versions.add(json.load(f)["version"])
+        self.assertEqual(len(versions), 1, versions)
 
 
 if __name__ == "__main__":

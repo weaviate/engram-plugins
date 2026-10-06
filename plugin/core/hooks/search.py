@@ -59,7 +59,7 @@ def emit(status=None, memories=None):
                 }
             )
         )
-        
+
 
 def run(assistant: Assistant) -> int:
     data = read_input()
@@ -67,15 +67,17 @@ def run(assistant: Assistant) -> int:
     if not prompt:
         return 0
     session_id = data.get("session_id", "")
+    turn = assistant.turn_id(data)
 
     warning = engram_warning()
     if warning:
-        debug("search unavailable", turn=assistant.turn_id(data), reason=warning)
+        debug("search unavailable", turn=turn, reason=warning)
         emit(status=[tag(warning)])
         return 0
 
     client = get_client(assistant)
     if client is None:
+        debug("search unavailable", turn=turn, reason="no client")
         emit(status=[tag("client unavailable.")])
         return 0
 
@@ -89,7 +91,7 @@ def run(assistant: Assistant) -> int:
             query=prompt, user_id=user_id, topics=topics, **kwargs
         )
     except Exception as e:
-        debug("search failed", turn=assistant.turn_id(data), error=e)
+        debug("search failed", turn=turn, error=e)
         emit(status=[tag(f"search failed: {e}")])
         return 0
 
@@ -103,7 +105,7 @@ def run(assistant: Assistant) -> int:
 
     bullets = "\n".join(f"- {m}" for m in memories)
 
-    debug("search", turn=assistant.turn_id(data), injected=len(memories), chars=len(bullets))
+    debug("search", turn=turn, injected=len(memories), chars=len(bullets))
 
     # Success is silent: warnings (if any) show this reply; memories are injected as context.
     emit(status=[tag(w) for w in warnings] or None, memories=bullets or None)
