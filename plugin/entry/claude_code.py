@@ -1,6 +1,6 @@
 import sys
 
-from ..assistants import ClaudeCode
+from assistants import ClaudeCode
 from . import main
 
 if __name__ == "__main__":

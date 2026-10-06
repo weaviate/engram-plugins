@@ -4,7 +4,7 @@ import os
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:  # importing core.assistants here would pull in the SDK at runtime
-    from .assistants import Assistant
+    from .assistant import Assistant
 
 _PLUGIN_ROOT = os.path.join(os.path.dirname(__file__), "..")
 

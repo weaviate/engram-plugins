@@ -12,7 +12,7 @@ from engram import EngramClient
 from .client_origin import client_origin_header
 
 if TYPE_CHECKING:
-    from .assistants import Assistant
+    from .assistant import Assistant
 
 DEFAULT_BASE = "https://api.engram.weaviate.io"
 

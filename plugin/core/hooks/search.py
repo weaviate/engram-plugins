@@ -9,7 +9,7 @@ reply and persist by being re-injected each turn, so a fixed problem stops showi
 
 import json
 
-from core.assistants import Assistant
+from core.assistant import Assistant
 
 from core import (  # noqa: I001 — core re-exports, kept after the typed import
     debug,

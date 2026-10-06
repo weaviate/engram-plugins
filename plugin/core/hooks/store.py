@@ -10,7 +10,7 @@ keeps that wake from looping within a single rewake."""
 
 import sys
 
-from core.assistants import Assistant
+from core.assistant import Assistant
 
 from core import (  # noqa: I001 — core re-exports, kept after the typed import
     debug,

@@ -1,4 +1,4 @@
-"""What every assistant has to answer for the hooks to work."""
+"""The contract core.hooks is written against. Implementations live in assistants/."""
 
 import json
 import os

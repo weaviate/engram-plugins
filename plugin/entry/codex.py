@@ -1,6 +1,6 @@
 import sys
 
-from ..assistants import Codex
+from assistants import Codex
 from . import main
 
 if __name__ == "__main__":

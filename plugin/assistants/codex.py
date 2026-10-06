@@ -1,4 +1,4 @@
-from .base import Assistant, Payload
+from core.assistant import Assistant, Payload
 
 
 class Codex(Assistant):

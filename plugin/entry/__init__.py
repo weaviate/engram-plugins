@@ -4,8 +4,8 @@ not look one up, so there is no selection to get wrong."""
 import sys
 from collections.abc import Callable, Sequence
 
-from ..assistants import Assistant
-from ..hooks import search, store
+from core.assistant import Assistant
+from core.hooks import search, store
 
 HOOKS: dict[str, Callable[[Assistant], int]] = {"search": search.run, "store": store.run}
 

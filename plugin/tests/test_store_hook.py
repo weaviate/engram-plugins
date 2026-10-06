@@ -12,7 +12,7 @@ import unittest
 import unittest.mock
 from types import SimpleNamespace
 
-from core.assistants import ClaudeCode
+from assistants import ClaudeCode
 from core.hooks import store
 
 

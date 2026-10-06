@@ -11,7 +11,8 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from core.assistants import Assistant, ClaudeCode, Codex  # noqa: E402
+from assistants import ClaudeCode, Codex  # noqa: E402
+from core.assistant import Assistant  # noqa: E402
 
 CLAUDE_CODE = ClaudeCode()
 CODEX = Codex()
@@ -156,7 +157,7 @@ class EntryPointTest(unittest.TestCase):
         self.assertEqual(CODEX.STORE_FAILURE_EXIT, 0)
 
     def test_every_assistant_has_an_entry_point(self):
-        root = os.path.join(os.path.dirname(__file__), "..", "core")
+        root = os.path.join(os.path.dirname(__file__), "..")
         for assistant in (CLAUDE_CODE, CODEX):
             name = assistant.NAME.replace("-", "_")
             self.assertTrue(os.path.isfile(os.path.join(root, "entry", f"{name}.py")), name)
@@ -181,7 +182,7 @@ class EntryPointTest(unittest.TestCase):
             ]
             self.assertTrue(commands, manifest_dir)
             for command in commands:
-                self.assertIn(f"-m core.entry.{entry} ", command)
+                self.assertIn(f"-m entry.{entry} ", command)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 from typing import Any
 
-from .base import Assistant, Payload
+from core.assistant import Assistant, Payload
 
 
 class ClaudeCode(Assistant):
