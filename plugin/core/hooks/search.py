@@ -9,9 +9,7 @@ reply and persist by being re-injected each turn, so a fixed problem stops showi
 
 import json
 
-from core.assistant import Assistant
-
-from core import (  # noqa: I001 — core re-exports, kept after the typed import
+from core import (
     debug,
     engram_warning,
     get_client,
@@ -19,6 +17,7 @@ from core import (  # noqa: I001 — core re-exports, kept after the typed impor
     read_input,
     search_filters,
 )
+from core.assistant import Assistant
 
 
 def tag(message):
@@ -61,7 +60,7 @@ def emit(status=None, memories=None):
                 }
             )
         )
-
+        
 
 def run(assistant: Assistant) -> int:
     data = read_input()

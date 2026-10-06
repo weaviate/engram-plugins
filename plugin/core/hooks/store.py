@@ -10,15 +10,14 @@ keeps that wake from looping within a single rewake."""
 
 import sys
 
-from core.assistant import Assistant
-
-from core import (  # noqa: I001 — core re-exports, kept after the typed import
+from core import (
     debug,
     get_client,
     get_user_id,
     read_input,
     resolve_scope,
 )
+from core.assistant import Assistant
 
 
 def run(assistant: Assistant) -> int:

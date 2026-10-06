@@ -5,14 +5,12 @@ import json
 import os
 import subprocess
 import urllib.request
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from engram import EngramClient
 
+from .assistant import Assistant
 from .client_origin import client_origin_header
-
-if TYPE_CHECKING:
-    from .assistant import Assistant
 
 DEFAULT_BASE = "https://api.engram.weaviate.io"
 
@@ -113,7 +111,7 @@ def _timeout() -> float:
     return seconds if seconds > 0 else DEFAULT_TIMEOUT
 
 
-def get_client(assistant: "Assistant | None" = None) -> EngramClient | None:
+def get_client(assistant: Assistant | None = None) -> EngramClient | None:
     api_key = engram_api_key()
     if not api_key:
         return None

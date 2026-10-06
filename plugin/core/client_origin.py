@@ -3,7 +3,7 @@ import json
 import os
 from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:  # importing core.assistants here would pull in the SDK at runtime
+if TYPE_CHECKING:  # tests load this module by path, where a relative import has no package
     from .assistant import Assistant
 
 _PLUGIN_ROOT = os.path.join(os.path.dirname(__file__), "..")

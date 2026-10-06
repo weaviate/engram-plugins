@@ -1,2 +1,2 @@
-"""Hook entrypoints shared by every host. Run as modules under the plugin venv, e.g.
-`python -m core.hooks.search` (UserPromptSubmit) and `.store` (Stop)."""
+"""What each hook does, written against the core.assistant contract rather than any one
+assistant. entry/ supplies the assistant and is what the hooks files invoke."""
