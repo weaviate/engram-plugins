@@ -3,22 +3,39 @@
     cd plugin && ~/.claude/plugins/data/engram-*/venv/bin/python -m unittest tests.test_assistants
 """
 
+import importlib
 import json
 import os
+import pathlib
+import subprocess
 import sys
 import tempfile
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import assistants  # noqa: E402
-from assistants import ClaudeCode, Codex  # noqa: E402
+from assistants.claude_code import ClaudeCode  # noqa: E402
+from assistants.codex import Codex  # noqa: E402
 from core.assistant import Assistant  # noqa: E402
 
 CLAUDE_CODE = ClaudeCode()
 CODEX = Codex()
-# Derived from the package so a newly registered assistant has to satisfy the checks below.
-EVERY_ASSISTANT = [getattr(assistants, name)() for name in assistants.__all__]
+
+
+def _every_assistant():
+    """Found on disk, so a new assistant module has to satisfy the wiring checks below."""
+    found = []
+    for path in sorted(pathlib.Path(__file__).parent.parent.glob("assistants/[!_]*.py")):
+        module = importlib.import_module(f"assistants.{path.stem}")
+        found += [
+            value()
+            for value in vars(module).values()
+            if isinstance(value, type) and issubclass(value, Assistant) and value is not Assistant
+        ]
+    return found
+
+
+EVERY_ASSISTANT = _every_assistant()
 
 
 def prompt(text, prompt_id, kind="human"):
@@ -157,9 +174,9 @@ class CodexTest(TranscriptFixture):
         self.assertEqual(CODEX.last_user_text({"transcript_path": self.path}), "second")
 
 
-class EntryPointTest(unittest.TestCase):
-    """Each assistant gets its own entry module naming itself, so nothing resolves an assistant
-    at runtime and there is no selection to get wrong."""
+class WiringTest(unittest.TestCase):
+    """Each assistant module names itself when run, so nothing resolves an assistant at runtime
+    and there is no selection to get wrong."""
 
     def test_store_failure_exit_differs_per_assistant(self):
         """Claude Code turns exit 2 into a wake carrying the reason; Codex reads it as
@@ -177,17 +194,31 @@ class EntryPointTest(unittest.TestCase):
         with self.assertRaises(TypeError):
             Incomplete()
 
+    def test_running_an_assistant_does_not_double_import_it(self):
+        """assistants/__init__.py must stay free of imports. Adding `from .claude_code import
+        ClaudeCode` there is the obvious edit, and it makes `python -m assistants.claude_code`
+        execute the module twice — two distinct classes, and a RuntimeWarning on stderr for every
+        hook invocation."""
+        root = pathlib.Path(__file__).parent.parent
+        for assistant in EVERY_ASSISTANT:
+            result = subprocess.run(
+                [sys.executable, "-m", f"assistants.{assistant.NAME.replace('-', '_')}"],
+                capture_output=True,
+                text=True,
+                cwd=root,
+                env={**os.environ, "PYTHONPATH": str(root), "PYTHONWARNINGS": "always"},
+            )
+            self.assertNotIn("RuntimeWarning", result.stderr, assistant.NAME)
+
     def test_every_assistant_is_wired_end_to_end(self):
-        """Each registered assistant needs an entry module, a manifest naming its own hooks file,
-        and commands in that file invoking its entry module. No hooks/hooks.json: Claude Code
-        merges the default into whatever the manifest names, so a shared default would leak one
-        assistant's entry point into the other's session."""
+        """Each registered assistant needs a manifest naming its own hooks file, and commands in
+        that file running its own module. No hooks/hooks.json: Claude Code merges the default into
+        whatever the manifest names, so a shared default would leak one assistant into the
+        other's session."""
         root = os.path.join(os.path.dirname(__file__), "..")
         self.assertFalse(os.path.exists(os.path.join(root, "hooks", "hooks.json")))
         for assistant in EVERY_ASSISTANT:
-            entry = assistant.NAME.replace("-", "_")
-            self.assertTrue(os.path.isfile(os.path.join(root, "entry", f"{entry}.py")), entry)
-
+            module = assistant.NAME.replace("-", "_")
             with open(os.path.join(root, assistant.MANIFEST_DIR, "plugin.json")) as f:
                 manifest = json.load(f)
             hooks_path = manifest["hooks"]
@@ -202,7 +233,7 @@ class EntryPointTest(unittest.TestCase):
             ]
             self.assertTrue(commands, assistant.NAME)
             for command in commands:
-                self.assertIn(f"-m entry.{entry} ", command)
+                self.assertIn(f"-m assistants.{module} ", command)
 
     def test_the_manifests_agree_on_the_version(self):
         """One plugin shipped to several assistants. Nothing else keeps these in step, and the

@@ -75,7 +75,7 @@ def run(assistant: Assistant) -> int:
         emit(status=[tag(warning)])
         return 0
 
-    client = get_client(assistant)
+    client = get_client()
     if client is None:
         debug("search unavailable", turn=turn, reason="no client")
         emit(status=[tag("client unavailable.")])

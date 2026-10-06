@@ -5,11 +5,9 @@ import json
 import os
 import subprocess
 import urllib.request
-from typing import Any
 
 from engram import EngramClient
 
-from .assistant import Assistant
 from .client_origin import client_origin_header
 
 DEFAULT_BASE = "https://api.engram.weaviate.io"
@@ -58,11 +56,11 @@ def _config(env_var):
     return os.environ.get(env_var) or _from_profile(env_var)
 
 
-def engram_api_key() -> str | None:
+def engram_api_key():
     return _config("ENGRAM_API_KEY")
 
 
-def engram_base_url() -> str:
+def engram_base_url():
     # Dev/override only. Env (or profile fallback) → default.
     return (
         os.environ.get("ENGRAM_BASE_URL")
@@ -71,7 +69,7 @@ def engram_base_url() -> str:
     )
 
 
-def get_user_id() -> str | None:
+def get_user_id():
     """Stable identity for memory scoping. ENGRAM_USER_ID (env or shell profile), then git email.
     Returns None when neither is set — callers MUST NOT fall back to a shared id like $USER or
     "default": memories are tagged with this id in Engram permanently, so a non-unique id would
@@ -93,9 +91,8 @@ def get_user_id() -> str | None:
 
 # One value, because every call is a single quick request: the SDK applies this per HTTP request,
 # and memories.add returns a run id as soon as the server accepts the work rather than waiting for
-# the pipeline. Measured round trips are under a second, so this is a ceiling for a slow network,
-# not a budget. It also stays well inside the 30s Claude Code caps UserPromptSubmit at, leaving
-# room for the venv build on a cold first prompt.
+# the pipeline. Ten seconds is a ceiling for a slow network, and stays inside the 30s Claude Code
+# caps UserPromptSubmit at, leaving room for the venv build on a cold first prompt.
 DEFAULT_TIMEOUT = 10.0
 
 
@@ -111,19 +108,19 @@ def _timeout() -> float:
     return seconds if seconds > 0 else DEFAULT_TIMEOUT
 
 
-def get_client(assistant: Assistant | None = None) -> EngramClient | None:
+def get_client():
     api_key = engram_api_key()
     if not api_key:
         return None
     return EngramClient(
         api_key=api_key,
         base_url=engram_base_url(),
-        headers=client_origin_header(assistant),
+        headers=client_origin_header(),
         timeout=_timeout(),
     )
 
 
-def engram_warning() -> str | None:
+def engram_warning():
     """Plain-text reason the plugin can't reach Engram, or None if it looks usable. The search
     hook prefixes it and surfaces it through the UserPromptSubmit directive."""
     if not engram_api_key():
@@ -133,7 +130,7 @@ def engram_warning() -> str | None:
     return None
 
 
-def engram_get(path: str) -> Any:
+def engram_get(path):
     """GET a JSON path from the Engram REST API and return the parsed JSON. Raises on any HTTP
     or network error — the caller resolving scope lets it propagate so the operation fails as a
     whole instead of continuing with a half-resolved scope."""

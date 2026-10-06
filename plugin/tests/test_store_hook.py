@@ -14,7 +14,7 @@ from types import SimpleNamespace
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from assistants import ClaudeCode  # noqa: E402
+from assistants.claude_code import ClaudeCode  # noqa: E402
 from core.hooks import store  # noqa: E402
 
 

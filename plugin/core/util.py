@@ -9,12 +9,9 @@ from typing import Any
 
 
 def read_input() -> dict[str, Any]:
-    """Parse the hook payload (a JSON object on stdin). A malformed payload raises — a hook
-    should never run on garbage input."""
-    data = json.load(sys.stdin)
-    if not isinstance(data, dict):
-        raise TypeError(f"hook payload must be a JSON object, got {type(data).__name__}")
-    return data
+    """Parse the hook payload (JSON on stdin). A malformed payload raises — a hook should
+    never run on garbage input."""
+    return json.load(sys.stdin)
 
 
 def debug(event: str, **fields: Any) -> None:
@@ -24,16 +21,13 @@ def debug(event: str, **fields: Any) -> None:
     sys.stderr.write(f"Engram · {event} {detail}\n")
 
 
-def data_dir() -> str:
-    """Plugin data dir (the venv, the schema cache, and state flags), provided by the assistant.
-    No guessed path on purpose: it would diverge between entry points and make bugs untraceable,
-    so fail loudly if neither variable is set.
-
-    The specific name is read first. Codex sets PLUGIN_DATA and aliases CLAUDE_PLUGIN_DATA to it,
-    so preferring the generic one would let a stray PLUGIN_DATA override the real value."""
-    d = os.environ.get("CLAUDE_PLUGIN_DATA") or os.environ.get("PLUGIN_DATA")
+def data_dir():
+    """Plugin data dir (the venv, the schema cache, and state flags), provided by the host via
+    CLAUDE_PLUGIN_DATA. No fallback on purpose: a guessed path diverges between entry points
+    (hooks vs the setup command) and makes bugs untraceable, so fail loudly if it's not set."""
+    d = os.environ.get("CLAUDE_PLUGIN_DATA")
     if not d:
-        raise RuntimeError("neither CLAUDE_PLUGIN_DATA nor PLUGIN_DATA is set")
+        raise RuntimeError("CLAUDE_PLUGIN_DATA not set — the host provides the plugin data dir")
     return d
 
 

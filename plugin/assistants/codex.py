@@ -22,3 +22,11 @@ class Codex(Assistant):
             if text:
                 return text
         return ""
+
+
+if __name__ == "__main__":
+    import sys
+
+    from core.hooks import dispatch
+
+    sys.exit(dispatch(Codex(), sys.argv))

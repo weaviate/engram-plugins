@@ -1,8 +1,8 @@
 """Shared, assistant-agnostic core for the Weaviate Engram memory plugins.
 
 core.hooks holds the work each hook does, written against the core.assistant contract. What
-differs between assistants lives in assistants/, and entry/ picks one. Nothing here imports
-either, so a new assistant never touches core."""
+differs between assistants lives in assistants/, where each module also runs those hooks for
+itself. Nothing here imports that, so a new assistant never touches core."""
 
 from .client import (
     engram_api_key,

@@ -1,8 +1,5 @@
-"""Vendor adapters. One module per assistant, each a subclass of core.assistant.Assistant.
+"""Vendor adapters. One module per assistant, each a subclass of core.assistant.Assistant and
+runnable as `python -m assistants.<name> <hook>`.
 
-A module that outgrows one file becomes a package here, the way sqlalchemy.dialects does."""
-
-from .claude_code import ClaudeCode
-from .codex import Codex
-
-__all__ = ["ClaudeCode", "Codex"]
+Deliberately empty of imports: a package that imports its own modules makes `python -m` load them
+twice and warn on every hook invocation."""

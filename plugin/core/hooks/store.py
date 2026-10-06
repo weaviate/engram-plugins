@@ -44,7 +44,7 @@ def run(assistant: Assistant) -> int:
     if not messages:
         return 0
 
-    client = get_client(assistant)
+    client = get_client()
     if client is None:
         debug("store unavailable", turn=turn, reason="no api key")
         return 0  # search surfaces a missing key/SDK immediately; nothing to wake about here

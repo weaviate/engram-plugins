@@ -7,7 +7,7 @@
           {
             "type": "command",
             "statusMessage": "Recalling memories from Engram…",
-            "command": "bash \"${PLUGIN_ROOT}/hooks/with-venv.sh\" -m entry.codex search"
+            "command": "bash \"${PLUGIN_ROOT}/hooks/with-venv.sh\" -m assistants.codex search"
           }
         ]
       }
@@ -19,7 +19,7 @@
           {
             "type": "command",
             "statusMessage": "Saving memory to Engram…",
-            "command": "bash \"${PLUGIN_ROOT}/hooks/with-venv.sh\" -m entry.codex store",
+            "command": "bash \"${PLUGIN_ROOT}/hooks/with-venv.sh\" -m assistants.codex store",
             "async": true
           }
         ]
