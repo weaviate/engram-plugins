@@ -202,7 +202,7 @@ class WiringTest(unittest.TestCase):
         root = pathlib.Path(__file__).parent.parent
         for assistant in EVERY_ASSISTANT:
             result = subprocess.run(
-                [sys.executable, "-m", f"assistants.{assistant.NAME.replace('-', '_')}"],
+                [sys.executable, "-m", type(assistant).__module__],
                 capture_output=True,
                 text=True,
                 cwd=root,
@@ -218,7 +218,7 @@ class WiringTest(unittest.TestCase):
         root = os.path.join(os.path.dirname(__file__), "..")
         self.assertFalse(os.path.exists(os.path.join(root, "hooks", "hooks.json")))
         for assistant in EVERY_ASSISTANT:
-            module = assistant.NAME.replace("-", "_")
+            module = type(assistant).__module__
             with open(os.path.join(root, assistant.MANIFEST_DIR, "plugin.json")) as f:
                 manifest = json.load(f)
             hooks_path = manifest["hooks"]
@@ -233,7 +233,7 @@ class WiringTest(unittest.TestCase):
             ]
             self.assertTrue(commands, assistant.NAME)
             for command in commands:
-                self.assertIn(f"-m assistants.{module} ", command)
+                self.assertIn(f"-m {module} ", command)
 
     def test_the_manifests_agree_on_the_version(self):
         """One plugin shipped to several assistants. Nothing else keeps these in step, and the

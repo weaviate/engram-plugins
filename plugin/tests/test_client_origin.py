@@ -16,8 +16,9 @@ spec.loader.exec_module(client_origin)
 
 
 class PlatformTest(unittest.TestCase):
-    def test_claude(self):
-        self.assertEqual(client_origin._platform(), "claude")
+    def test_names_the_assistant_given(self):
+        header = client_origin.client_origin_header("codex")["X-Engram-Client"]
+        self.assertTrue(header.startswith("codex-plugin/"), header)
 
 
 class PluginVersionTest(unittest.TestCase):

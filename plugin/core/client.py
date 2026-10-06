@@ -108,14 +108,14 @@ def _timeout() -> float:
     return seconds if seconds > 0 else DEFAULT_TIMEOUT
 
 
-def get_client():
+def get_client(assistant: str = "claude") -> EngramClient | None:
     api_key = engram_api_key()
     if not api_key:
         return None
     return EngramClient(
         api_key=api_key,
         base_url=engram_base_url(),
-        headers=client_origin_header(),
+        headers=client_origin_header(assistant),
         timeout=_timeout(),
     )
 

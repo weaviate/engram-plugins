@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Stop hook: store the completed turn — user message and the assistant's answer — in Engram as
 an OpenAI-format conversation.
 
@@ -24,7 +25,6 @@ def run(assistant: Assistant) -> int:
     if data.get("stop_hook_active"):
         return 0
 
-    session_id = data.get("session_id", "")
     turn = assistant.turn_id(data)
 
     # Recall still runs for these turns, but the user half is machine markup and the work they
@@ -44,7 +44,7 @@ def run(assistant: Assistant) -> int:
     if not messages:
         return 0
 
-    client = get_client()
+    client = get_client(assistant.NAME)
     if client is None:
         debug("store unavailable", turn=turn, reason="no api key")
         return 0  # search surfaces a missing key/SDK immediately; nothing to wake about here
@@ -55,7 +55,9 @@ def run(assistant: Assistant) -> int:
         return 0  # search surfaces missing identity immediately
 
     try:
-        properties, _user_required, _unmapped = resolve_scope(data.get("cwd", ""), session_id)
+        properties, _user_required, _unmapped = resolve_scope(
+            data.get("cwd", ""), data.get("session_id", "")
+        )
         added = client.memories.add(messages, user_id=user_id, properties=properties or None)
     except Exception as e:
         # Claude Code turns this exit code into a wake showing the stderr below; Codex would

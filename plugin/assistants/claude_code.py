@@ -4,7 +4,7 @@ from core.assistant import Assistant, Payload
 
 
 class ClaudeCode(Assistant):
-    NAME = "claude-code"
+    NAME = "claude"
     MANIFEST_DIR = ".claude-plugin"
     STORE_FAILURE_EXIT = 2  # asyncRewake turns this into a wake showing our stderr
 

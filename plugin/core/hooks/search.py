@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """UserPromptSubmit hook: search Engram for memories relevant to the prompt and inject them as
 additionalContext for the assistant to use. Recalled memories are injected silently as context;
 warnings/errors ride in the model's reply (additionalContext directive), not a hook
@@ -75,9 +76,8 @@ def run(assistant: Assistant) -> int:
         emit(status=[tag(warning)])
         return 0
 
-    client = get_client()
+    client = get_client(assistant.NAME)
     if client is None:
-        debug("search unavailable", turn=turn, reason="no client")
         emit(status=[tag("client unavailable.")])
         return 0
 
