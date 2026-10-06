@@ -1,7 +1,8 @@
 """Shared, assistant-agnostic core for the Weaviate Engram memory plugins.
 
-Hosts differ only in their plugin manifest; the hook entrypoints in core.hooks speak the
-host's stdin/stdout protocol."""
+core.hooks holds the work each hook does, written against the core.assistant contract. What
+differs between assistants lives in assistants/, where each module also runs those hooks for
+itself. Nothing here imports that, so a new assistant never touches core."""
 
 from .client import (
     engram_api_key,
@@ -14,8 +15,7 @@ from .client import (
 from .config import load_config, user_config_path
 from .scope import resolve_scope, scope_schema
 from .search import search_filters
-from .transcript import last_user_text
-from .util import data_dir, read_input
+from .util import data_dir, debug, read_input
 
 __all__ = [
     "engram_api_key",
@@ -29,7 +29,7 @@ __all__ = [
     "resolve_scope",
     "scope_schema",
     "search_filters",
-    "last_user_text",
     "data_dir",
+    "debug",
     "read_input",
 ]
