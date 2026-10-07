@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Stop hook: store the completed turn — user message + assistant's answer — in
 Engram as an OpenAI-format conversation, then wait briefly for the run to commit and record the
-memory ids it wrote, so search can leave this session's own memories out.
+memory ids it created, so search can leave this session's own memories out.
 
 Success is silent. A store failure writes to stderr and exits with the assistant's own
 STORE_FAILURE_EXIT, because the same code means opposite things: Claude Code wakes and reports
@@ -81,7 +81,8 @@ def run(assistant: Assistant) -> int:
     except Exception as e:
         debug("store poll failed", turn=turn, run_id=added.run_id, error=e)
         return 0
-    ids = [op.memory_id for op in (*status.memories_created, *status.memories_updated)]
+    # Not updated ones: a memory this turn merged into is mostly earlier sessions' knowledge.
+    ids = [op.memory_id for op in status.memories_created]
 
     session_state.add(data.get("session_id", ""), "own", ids)
     debug("store settled", turn=turn, status=status.status, own=len(ids))

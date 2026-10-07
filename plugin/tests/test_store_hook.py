@@ -110,10 +110,11 @@ class StoreHookTest(unittest.TestCase):
         self.assertEqual(self.run_hook(entries), 0)
         self.assertEqual(self.added, [])
 
-    def test_the_memories_a_store_wrote_are_recorded_as_this_sessions(self):
-        """Created and updated alike: a memory this turn merged into now carries its words."""
+    def test_only_the_memories_a_store_created_are_recorded_as_this_sessions(self):
+        """A memory this turn merged into is mostly earlier sessions' knowledge, so it stays
+        recallable."""
         self.assertEqual(self.run_hook([prompt("fix the scope config", "a")]), 0)
-        self.assertEqual(session_state.load("s", "own"), {"m1", "m2"})
+        self.assertEqual(session_state.load("s", "own"), {"m1"})
 
     def test_a_buffered_run_ends_the_poll_at_once(self):
         """in_buffer waits on a trigger that can take minutes, so there is nothing to wait for."""
