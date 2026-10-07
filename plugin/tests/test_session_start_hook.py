@@ -164,6 +164,10 @@ class SessionStartHookTest(unittest.TestCase):
         self.results = RuntimeError("connection reset")
         self.assertIn("connection reset", self.run_hook())
 
+    def test_a_malformed_memory_is_reported_not_raised(self):
+        self.results = [memory("a", "fact a"), memory("b", "fact b", created_at=None)]
+        self.assertIn("Engram · loading memories at session start failed", self.run_hook())
+
     def test_a_missing_key_is_left_for_search_to_report(self):
         with unittest.mock.patch.object(session_start, "engram_warning", lambda: "no key"):
             self.assertEqual(self.run_hook(), "")
