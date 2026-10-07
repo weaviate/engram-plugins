@@ -6,10 +6,6 @@ _MANIFEST = os.path.join(
 )
 
 
-def _platform():
-    return "claude"
-
-
 def _plugin_version():
     try:
         with open(_MANIFEST) as f:
@@ -18,5 +14,7 @@ def _plugin_version():
         return "unknown"
 
 
-def client_origin_header():
-    return {"X-Engram-Client": f"{_platform()}-plugin/{_plugin_version()}"}
+def client_origin_header(assistant: str = "claude") -> dict[str, str]:
+    """The assistant whose session made the call. The default covers the migration CLI and the
+    schema fetch, which run outside any one assistant's hooks."""
+    return {"X-Engram-Client": f"{assistant}-plugin/{_plugin_version()}"}

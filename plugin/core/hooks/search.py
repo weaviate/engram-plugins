@@ -8,15 +8,15 @@ Stateless — no per-session files. Success is silent. Warnings/errors are scope
 reply and persist by being re-injected each turn, so a fixed problem stops showing on its own."""
 
 import json
-import sys
 
 from core import (
+    debug,
     engram_warning,
     get_client,
     get_user_id,
-    read_input,
     search_filters,
 )
+from core.classes import Assistant
 
 
 def tag(message):
@@ -61,19 +61,18 @@ def emit(status=None, memories=None):
         )
 
 
-def main():
-    data = read_input()
-    prompt = (data.get("prompt") or "").strip()
+def run(assistant: Assistant) -> int:
+    data = assistant.read_input()
+    prompt = data.prompt.strip()
     if not prompt:
         return 0
-    session_id = data.get("session_id", "")
-
     warning = engram_warning()
     if warning:
+        debug("search unavailable", turn=data.turn_id, reason=warning)
         emit(status=[tag(warning)])
         return 0
 
-    client = get_client()
+    client = get_client(assistant.NAME)
     if client is None:
         emit(status=[tag("client unavailable.")])
         return 0
@@ -82,12 +81,13 @@ def main():
     # Resolving filters reads the scope schema from Engram; that and the search run under one
     # try, so a failure anywhere fails the whole operation with a single error.
     try:
-        topics, properties, warnings = search_filters(data.get("cwd", ""), session_id)
+        topics, properties, warnings = search_filters(data.cwd, data.session_id)
         kwargs = {"properties": properties} if properties else {}
         results = client.memories.search(
             query=prompt, user_id=user_id, topics=topics, **kwargs
         )
     except Exception as e:
+        debug("search failed", turn=data.turn_id, error=e)
         emit(status=[tag(f"search failed: {e}")])
         return 0
 
@@ -101,10 +101,8 @@ def main():
 
     bullets = "\n".join(f"- {m}" for m in memories)
 
+    debug("search", turn=data.turn_id, injected=len(memories), chars=len(bullets))
+
     # Success is silent: warnings (if any) show this reply; memories are injected as context.
     emit(status=[tag(w) for w in warnings] or None, memories=bullets or None)
     return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())

@@ -1,0 +1,29 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${PLUGIN_ROOT}/hooks/with-venv.sh\" -m assistants.codex search",
+            "statusMessage": "Recalling memories from Engram…"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${PLUGIN_ROOT}/hooks/with-venv.sh\" -m assistants.codex store",
+            "async": true,
+            "statusMessage": "Saving memory to Engram…"
+          }
+        ]
+      }
+    ]
+  }
+}
