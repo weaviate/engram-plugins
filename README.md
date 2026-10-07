@@ -7,6 +7,8 @@ decisions, and project context across sessions — and recalls what's relevant b
 - **Recall** — before each answer, relevant memories are fetched and added to the conversation,
   leaving out what the current session saved, which Claude already has.
 - **Store** — after each turn, the exchange is saved so it can be recalled later.
+- **Preferences** — when a session starts, your preferences are loaded once for the whole
+  session, and recall before each answer leaves them out.
 
 Memory is best-effort: it never blocks or breaks a session. When something needs your attention
 (bad key, misconfigured scope), Claude surfaces a short `Engram · …` note at the top of its reply.
@@ -62,6 +64,9 @@ Global `~/.engram/config.json`:
       { "name": "product_knowledge", "properties": ["product"] },
       { "name": "change_summary", "clear_properties": ["codebase"] }
     ]
+  },
+  "session_start": {
+    "topic": "tooling_preferences"
   }
 }
 ```
@@ -102,6 +107,16 @@ The JSON **shape** decides — no ambiguity:
 - `search.properties` — restrict recall to memories matching these scope keys.
 - `search.topics` — restrict recall to specific memory topics, optionally with their own filters.
 
+### Session start
+
+- `session_start.topic` — the topic loaded in full when a session starts (and again after a
+  compaction), rather than recalled per answer. `null` turns it off.
+
+Any topic works, but a **bounded** topic is recommended. Engram keeps a single memory per scope in
+a bounded topic and keeps rewriting it as it learns, so the session starts with one current
+memory. An unbounded topic is loaded newest first until the size budget runs out, and the rest
+is left to per-answer recall.
+
 ### Inferred configuration
 
 With the default Engram project (quickstart) configuration, properties are inferred:
@@ -109,7 +124,9 @@ With the default Engram project (quickstart) configuration, properties are infer
 - `repo_name` → `git-repo`, then `cwd` (in that order)
 - `session_id` → `session_id` from the assistant
 
-and search is narrowed to the `repo_name` property. You can still use `.engram.json` to change this inferred behaviour.
+and search is narrowed to the `repo_name` property. If your project has a `DeveloperPreferences`
+topic (bounded, in the quickstart setup), it is the session start topic. You can still use
+`.engram.json` to change this inferred behaviour.
 
 ## Migrating from another memory system
 
