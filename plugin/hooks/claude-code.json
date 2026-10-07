@@ -6,7 +6,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/with-venv.sh\" -m assistants.claude_code session_start"
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/with-venv.sh\" -m assistants.claude_code session_start",
+            "statusMessage": "Starting Engram…"
           }
         ]
       }
