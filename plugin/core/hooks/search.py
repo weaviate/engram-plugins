@@ -101,8 +101,8 @@ def run(assistant: Assistant) -> int:
         emit(status=[_tag(f"search failed: {e}")])
         return 0
 
-    own = session_state.load(data.session_id, "own", assistant.data_dir())
-    shown = session_state.load(data.session_id, "shown", assistant.data_dir())
+    own = session_state.load(data.session_id, "own")
+    shown = session_state.load(data.session_id, "shown") | session_state.load(data.session_id, "preloaded")
     memories, injected_ids, skipped_own, skipped_shown = [], [], 0, 0
     for m in results:
         if len(memories) == INJECT_LIMIT:
@@ -130,7 +130,7 @@ def run(assistant: Assistant) -> int:
 
     # Success is silent: warnings (if any) show this reply; memories are injected as context.
     emit(status=[_tag(w) for w in warnings] or None, memories=bullets or None)
-    session_state.add(data.session_id, "shown", injected_ids, assistant.data_dir())
+    session_state.add(data.session_id, "shown", injected_ids)
     return 0
 
 
