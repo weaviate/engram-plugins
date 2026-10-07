@@ -104,7 +104,7 @@ def run(assistant: Assistant) -> int:
         return 0
 
     own = session_state.load(session_id, "own")
-    shown = session_state.load(session_id, "shown")
+    shown = session_state.load(session_id, "shown") | session_state.load(session_id, "preloaded")
     memories, injected_ids, skipped_own, skipped_shown = [], [], 0, 0
     for m in results:
         if len(memories) == INJECT_LIMIT:

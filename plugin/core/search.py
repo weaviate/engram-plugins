@@ -1,15 +1,17 @@
 """Search-side scoping: build the Engram `topics` and cross-topic `properties` filters from
-the config `search` block."""
+the config `search` block, and pick the topic injected at session start."""
 
 from engram import Topic
 
 from .config import load_config
-from .scope import config_warnings, resolve_scope
+from .scope import config_warnings, resolve_scope, scope_schema
 
 # Cross-topic search filter used when config doesn't set search.properties — scopes recall to the
 # current repo (only applied if the key resolves). Override via config, or clear with
 # "search": {"properties": []} to search broadly.
 DEFAULT_SEARCH_PROPERTIES = ["repo_name"]
+
+DEFAULT_SESSION_START_TOPIC = "DeveloperPreferences"
 
 
 def _build_topics(spec, resolved):
@@ -82,3 +84,23 @@ def search_filters(cwd, session_id):
             'check the source/env in your .engram.json "properties".'
         )
     return topics, (cross or None), warnings
+
+
+def session_start_topic(cwd):
+    """The topic injected in full at session start, from config `session_start.topic` (null
+    turns it off), else DEFAULT_SESSION_START_TOPIC if the cached schema has it. A bounded topic
+    is recommended. Returns (topic, error_message)."""
+    session_start = load_config(cwd).get("session_start") or {}
+    if "topic" not in session_start:
+        if _schema_has_topic(DEFAULT_SESSION_START_TOPIC):
+            return DEFAULT_SESSION_START_TOPIC, None
+        return None, None
+    topic = session_start["topic"]
+    if topic is not None and not isinstance(topic, str):
+        return None, "config session_start.topic must be a topic name, or null to turn it off"
+    return (topic or "").strip() or None, None
+
+
+def _schema_has_topic(name):
+    topics = (scope_schema().get("raw") or {}).get("topics") or []
+    return any(t.get("topic_name") == name for t in topics)

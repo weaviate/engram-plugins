@@ -14,7 +14,7 @@ from .client import (
 )
 from .config import load_config, user_config_path
 from .scope import resolve_scope, scope_schema
-from .search import search_filters
+from .search import search_filters, session_start_topic
 from .util import data_dir, debug, read_input
 
 __all__ = [
@@ -29,6 +29,7 @@ __all__ = [
     "resolve_scope",
     "scope_schema",
     "search_filters",
+    "session_start_topic",
     "data_dir",
     "debug",
     "read_input",

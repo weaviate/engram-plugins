@@ -1,7 +1,8 @@
 """
 Session state management. Creates plain text files in <data dir>/sessions/ to 
 track memory ids per session. Files are named <session_id>.<kind>, where kind 
-is "own" (created during the session) or "shown" (already retrieved that session).
+is "own" (created during the session), "shown" (already retrieved that session) or
+"preloaded" (injected at session start, which compaction does not reset).
 IDs are appended a line at a time.
 """
 
