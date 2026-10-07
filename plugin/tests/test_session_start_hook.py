@@ -14,7 +14,7 @@ from types import SimpleNamespace
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from engram import FetchRetrieval, Memory, SearchResults  # noqa: E402
+from engram import FetchRetrieval, Memory, SearchResults, Topic  # noqa: E402
 
 from assistants.claude_code import ClaudeCode  # noqa: E402
 from core import config, search as core_search, session_state  # noqa: E402
@@ -137,6 +137,15 @@ class SessionStartHookTest(unittest.TestCase):
         (call,) = self.calls
         self.assertEqual(call["topics"], ["DeveloperPreferences"])
         self.assertIsInstance(call["retrieval_config"], FetchRetrieval)
+
+    def test_uses_the_topic_filter_configured_for_search(self):
+        cross_repo = Topic(name="DeveloperPreferences", properties={"repo_name": None})
+        filters = ([cross_repo, "Processes"], {"repo_name": "owner/repo"}, [])
+        with unittest.mock.patch.object(session_start, "search_filters", lambda *_: filters):
+            self.run_hook()
+        (call,) = self.calls
+        self.assertEqual(call["topics"], [cross_repo])
+        self.assertEqual(call["properties"], {"repo_name": "owner/repo"})
 
     def test_search_skips_what_session_start_injected(self):
         self.results = [memory("prefs", "prefers small commits")]

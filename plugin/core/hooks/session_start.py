@@ -2,7 +2,7 @@
 
 import json
 
-from engram import FetchRetrieval, Memory
+from engram import FetchRetrieval, Memory, Topic
 
 from core import (
     debug,
@@ -60,11 +60,11 @@ def run(assistant: Assistant) -> int:
             return 0
         if topic is None:
             return 0
-        _topics, properties, _warnings = search_filters(cwd, session_id)
+        search_topics, properties, _warnings = search_filters(cwd, session_id)
         results = client.memories.search(
             query=topic,
             user_id=get_user_id(),
-            topics=[topic],
+            topics=[_with_search_filter(topic, search_topics)],
             retrieval_config=FetchRetrieval(limit=FETCH_LIMIT),
             properties=properties,
         )
@@ -94,6 +94,13 @@ def run(assistant: Assistant) -> int:
         )
     session_state.add(session_id, "shown", [m.id for m in injected])
     return 0
+
+
+def _with_search_filter(topic: str, search_topics: list[str | Topic] | None) -> str | Topic:
+    for search_topic in search_topics or []:
+        if isinstance(search_topic, Topic) and search_topic.name == topic:
+            return search_topic
+    return topic
 
 
 def _fit(memories: list[Memory]) -> tuple[list[Memory], str]:
