@@ -39,13 +39,10 @@ def memory(memory_id, content, **properties):
 class SearchHookTest(unittest.TestCase):
     def setUp(self):
         self.results = []
+        self.search_kwargs = {}
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
-        client = SimpleNamespace(
-            memories=SimpleNamespace(
-                search=lambda **_: SearchResults(self.results, len(self.results))
-            )
-        )
+        client = SimpleNamespace(memories=SimpleNamespace(search=self.search))
         for patch in (
             unittest.mock.patch.object(search, "engram_warning", lambda: None),
             unittest.mock.patch.object(search, "get_client", lambda *_: client),
@@ -55,6 +52,10 @@ class SearchHookTest(unittest.TestCase):
         ):
             patch.start()
             self.addCleanup(patch.stop)
+
+    def search(self, **kwargs):
+        self.search_kwargs = kwargs
+        return SearchResults(self.results, len(self.results))
 
     def injected(self):
         payload = {"prompt": "how do we run the tests", "session_id": SESSION, "cwd": "."}
@@ -79,6 +80,18 @@ class SearchHookTest(unittest.TestCase):
         self.assertNotIn("a process noted earlier this session", context)
         self.assertIn("what another session did", context)
         self.assertIn("tests run with unittest discover", context)
+
+    def test_injects_the_top_five_left_after_exclusion(self):
+        """Over-fetching is what keeps exclusion from emptying the injection."""
+        session_state.add(SESSION, "shown", ["m0", "m1", "m2"])
+        self.results = [memory(f"m{i}", f"fact {i}") for i in range(10)]
+        context = self.injected()
+        self.assertEqual(self.search_kwargs["retrieval_config"].limit, search.SEARCH_LIMIT)
+        for i in range(10):
+            if 3 <= i <= 7:
+                self.assertIn(f"fact {i}", context)
+            else:
+                self.assertNotIn(f"fact {i}", context)
 
     def test_a_memory_is_injected_once_per_session(self):
         self.results = [memory("a", "fact a"), memory("b", "fact b")]

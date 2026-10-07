@@ -9,7 +9,7 @@ reply and persist by being re-injected each turn, so a fixed problem stops showi
 
 import json
 
-from engram import Memory
+from engram import HybridRetrieval, Memory
 
 from core import (
     debug,
@@ -21,6 +21,11 @@ from core import (
     session_state,
 )
 from core.assistant import Assistant
+
+# Fetch well past what is injected: memories this session wrote or has already been shown are
+# dropped after the search, and what remains should still fill the injection.
+SEARCH_LIMIT = 30
+INJECT_LIMIT = 5
 
 
 def emit(status=None, memories=None):
@@ -87,7 +92,11 @@ def run(assistant: Assistant) -> int:
         topics, properties, warnings = search_filters(data.get("cwd", ""), session_id)
         kwargs = {"properties": properties} if properties else {}
         results = client.memories.search(
-            query=prompt, user_id=user_id, topics=topics, **kwargs
+            query=prompt,
+            user_id=user_id,
+            topics=topics,
+            retrieval_config=HybridRetrieval(limit=SEARCH_LIMIT),
+            **kwargs,
         )
     except Exception as e:
         debug("search failed", turn=turn, error=e)
@@ -98,6 +107,8 @@ def run(assistant: Assistant) -> int:
     shown = session_state.load(session_id, "shown")
     memories, injected_ids, skipped_own, skipped_shown = [], [], 0, 0
     for m in results:
+        if len(memories) == INJECT_LIMIT:
+            break
         if _written_this_session(m, session_id, own):
             skipped_own += 1
             continue
