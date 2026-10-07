@@ -18,7 +18,7 @@ from engram import FetchRetrieval, Memory, SearchResults, Topic  # noqa: E402
 
 from assistants.claude_code import ClaudeCode  # noqa: E402
 from core import config, search as core_search, session_state  # noqa: E402
-from core.hooks import search, session_start  # noqa: E402
+from core.hooks import post_compact, search, session_start  # noqa: E402
 
 SESSION = "0c9f6d1e-5a7b-4c2d-9e8f-1a2b3c4d5e6f"
 
@@ -155,6 +155,21 @@ class SessionStartHookTest(unittest.TestCase):
         self.assertNotIn("prefers small commits", context)
         self.assertIn("fact", context)
 
+    def test_compaction_in_either_order_keeps_search_from_repeating_the_topic(self):
+        self.results = [memory("prefs", "prefers small commits"), memory("other", "fact")]
+        for hooks in ([session_start, post_compact], [post_compact, session_start]):
+            for hook in hooks:
+                self.run_hook(hook, source="compact", trigger="auto")
+            self.assertNotIn("prefers small commits", self.run_hook(search, prompt="commits?"))
+
+    def test_search_recalls_the_topic_when_session_start_fails(self):
+        self.results = [memory("prefs", "prefers small commits")]
+        self.run_hook()
+        self.results = RuntimeError("connection reset")
+        self.run_hook(source="compact")
+        self.results = [memory("prefs", "prefers small commits")]
+        self.assertIn("prefers small commits", self.run_hook(search, prompt="commits?"))
+
     def test_no_topic_fetches_nothing(self):
         self.topic = (None, None)
         self.assertEqual(self.run_hook(), "")
@@ -162,7 +177,7 @@ class SessionStartHookTest(unittest.TestCase):
 
     def test_an_empty_topic_injects_nothing(self):
         self.assertEqual(self.run_hook(), "")
-        self.assertEqual(session_state.load(SESSION, "shown"), set())
+        self.assertEqual(session_state.load(SESSION, "preloaded"), set())
 
     def test_a_config_error_is_reported_without_fetching(self):
         self.topic = (None, "config session_start.topic must be a topic name")
@@ -199,14 +214,14 @@ class SessionStartHookTest(unittest.TestCase):
         self.assertLess(context.index("newest"), context.index("middle"))
         self.assertNotIn("oldest", context)
         self.assertNotIn(session_start.TRUNCATED, context)
-        self.assertEqual(session_state.load(SESSION, "shown"), {"newest", "middle"})
+        self.assertEqual(session_state.load(SESSION, "preloaded"), {"newest", "middle"})
 
     def test_a_memory_too_long_to_fit_is_cut_not_dropped(self):
         self.results = [memory("prefs", "p" * (session_start.MAX_CHARS * 2))]
         context = self.run_hook()
         self.assertIn(session_start.TRUNCATED, context)
         self.assertLess(len(context), session_start.MAX_CHARS + 500)
-        self.assertEqual(session_state.load(SESSION, "shown"), {"prefs"})
+        self.assertEqual(session_state.load(SESSION, "preloaded"), {"prefs"})
 
 
 if __name__ == "__main__":

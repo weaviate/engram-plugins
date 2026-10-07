@@ -45,6 +45,8 @@ def run(assistant: Assistant) -> int:
     session_state.clean()
 
     data = read_input()
+    session_id = data.get("session_id", "")
+    session_state.reset(session_id, "preloaded")
     if engram_warning():
         return 0
     client = get_client(assistant.NAME)
@@ -52,7 +54,6 @@ def run(assistant: Assistant) -> int:
         return 0
 
     cwd = data.get("cwd", "")
-    session_id = data.get("session_id", "")
     try:
         topic, error = session_start_topic(cwd)
         if error:
@@ -92,7 +93,7 @@ def run(assistant: Assistant) -> int:
             f"Standing memory from Engram (topic {topic}), loaded once for the whole session. "
             "Apply it throughout unless the user says otherwise:\n" + text
         )
-    session_state.add(session_id, "shown", [m.id for m in injected])
+    session_state.add(session_id, "preloaded", [m.id for m in injected])
     return 0
 
 
