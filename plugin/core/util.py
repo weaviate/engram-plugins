@@ -1,17 +1,10 @@
-"""Low-level helpers with no intra-package dependencies: stdin parsing, the data dir, and git
+"""Low-level helpers with no intra-package dependencies: debug logging, the data dir, and git
 lookups. Kept dependency-free so config/scope can import it without import cycles."""
 
-import json
 import os
 import subprocess
 import sys
 from typing import Any
-
-
-def read_input():
-    """Parse the hook payload (JSON on stdin). A malformed payload raises — a hook should
-    never run on garbage input."""
-    return json.load(sys.stdin)
 
 
 def debug(event: str, **fields: Any) -> None:

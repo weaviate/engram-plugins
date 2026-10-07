@@ -14,10 +14,9 @@ from core import (
     engram_warning,
     get_client,
     get_user_id,
-    read_input,
     search_filters,
 )
-from core.assistant import Assistant
+from core.classes import Assistant
 
 
 def tag(message):
@@ -63,16 +62,13 @@ def emit(status=None, memories=None):
 
 
 def run(assistant: Assistant) -> int:
-    data = read_input()
-    prompt = (data.get("prompt") or "").strip()
+    data = assistant.read_input()
+    prompt = data.prompt.strip()
     if not prompt:
         return 0
-    session_id = data.get("session_id", "")
-    turn = assistant.turn_id(data)
-
     warning = engram_warning()
     if warning:
-        debug("search unavailable", turn=turn, reason=warning)
+        debug("search unavailable", turn=data.turn_id, reason=warning)
         emit(status=[tag(warning)])
         return 0
 
@@ -85,13 +81,13 @@ def run(assistant: Assistant) -> int:
     # Resolving filters reads the scope schema from Engram; that and the search run under one
     # try, so a failure anywhere fails the whole operation with a single error.
     try:
-        topics, properties, warnings = search_filters(data.get("cwd", ""), session_id)
+        topics, properties, warnings = search_filters(data.cwd, data.session_id)
         kwargs = {"properties": properties} if properties else {}
         results = client.memories.search(
             query=prompt, user_id=user_id, topics=topics, **kwargs
         )
     except Exception as e:
-        debug("search failed", turn=turn, error=e)
+        debug("search failed", turn=data.turn_id, error=e)
         emit(status=[tag(f"search failed: {e}")])
         return 0
 
@@ -105,7 +101,7 @@ def run(assistant: Assistant) -> int:
 
     bullets = "\n".join(f"- {m}" for m in memories)
 
-    debug("search", turn=turn, injected=len(memories), chars=len(bullets))
+    debug("search", turn=data.turn_id, injected=len(memories), chars=len(bullets))
 
     # Success is silent: warnings (if any) show this reply; memories are injected as context.
     emit(status=[tag(w) for w in warnings] or None, memories=bullets or None)

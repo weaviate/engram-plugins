@@ -1,6 +1,8 @@
+import json
+import sys
 from typing import Any
 
-from core.assistant import Assistant, Payload
+from core.classes import Assistant, InputData
 
 
 class ClaudeCode(Assistant):
@@ -8,10 +10,11 @@ class ClaudeCode(Assistant):
     MANIFEST_DIR = ".claude-plugin"
     STORE_FAILURE_EXIT = 2  # asyncRewake turns this into a wake showing our stderr
 
-    def turn_id(self, payload: Payload) -> str:
-        return payload.get("prompt_id") or ""
+    def read_input(self) -> InputData:
+        payload = json.load(sys.stdin)
+        return InputData.from_payload({**payload, "turn_id": payload.get("prompt_id")})
 
-    def last_user_text(self, payload: Payload) -> str:
+    def last_user_text(self, payload: InputData) -> str:
         for entry in self.transcript(payload):
             if entry.get("type") != "user":
                 continue
@@ -23,13 +26,13 @@ class ClaudeCode(Assistant):
                 return text
         return ""
 
-    def is_automated(self, payload: Payload) -> bool:
+    def is_automated(self, payload: InputData) -> bool:
         # An unrecognised origin counts as human.
         origin = self._origin(payload)
         return origin is not None and origin != "human"
 
-    def _origin(self, payload: Payload) -> str | None:
-        prompt_id = self.turn_id(payload)
+    def _origin(self, payload: InputData) -> str | None:
+        prompt_id = payload.turn_id
         if not prompt_id:
             return None
         for entry in self.transcript(payload):
@@ -65,8 +68,6 @@ def _is_tool_only(content: Any) -> bool:
 
 
 if __name__ == "__main__":
-    import sys
-
     from core.hooks import dispatch
 
     sys.exit(dispatch(ClaudeCode(), sys.argv))

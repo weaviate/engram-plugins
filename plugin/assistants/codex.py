@@ -1,14 +1,11 @@
-from core.assistant import Assistant, Payload
+from core.classes import Assistant, InputData
 
 
 class Codex(Assistant):
     NAME = "codex"
     MANIFEST_DIR = ".codex-plugin"
 
-    def turn_id(self, payload: Payload) -> str:
-        return payload.get("turn_id") or ""
-
-    def last_user_text(self, payload: Payload) -> str:
+    def last_user_text(self, payload: InputData) -> str:
         """Rollout entries wrap a message in `payload`, and use a `developer` role for injected
         context nobody typed."""
         for entry in self.transcript(payload):

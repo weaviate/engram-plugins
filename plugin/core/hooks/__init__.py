@@ -1,10 +1,10 @@
-"""What each hook does, written against the core.assistant contract rather than any one
+"""What each hook does, written against the core.classes contract rather than any one
 assistant. Each assistant module runs these by name."""
 
 import sys
 from collections.abc import Callable, Sequence
 
-from core.assistant import Assistant
+from core.classes import Assistant
 
 from . import search, store
 

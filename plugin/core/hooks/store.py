@@ -14,26 +14,23 @@ from core import (
     debug,
     get_client,
     get_user_id,
-    read_input,
     resolve_scope,
 )
-from core.assistant import Assistant
+from core.classes import Assistant
 
 
 def run(assistant: Assistant) -> int:
-    data = read_input()
-    if data.get("stop_hook_active"):
+    data = assistant.read_input()
+    if data.stop_hook_active:
         return 0
-
-    turn = assistant.turn_id(data)
 
     # Recall still runs for these turns, but the user half is machine markup and the work they
     # describe is stored with the human turn that follows.
     if assistant.is_automated(data):
-        debug("store skipped", turn=turn, assistant=assistant.NAME)
+        debug("store skipped", turn=data.turn_id, assistant=assistant.NAME)
         return 0
 
-    answer = (data.get("last_assistant_message") or "").strip()
+    answer = data.last_assistant_message.strip()
     user = assistant.last_user_text(data)
 
     messages = []
@@ -46,18 +43,16 @@ def run(assistant: Assistant) -> int:
 
     client = get_client(assistant.NAME)
     if client is None:
-        debug("store unavailable", turn=turn, reason="no api key")
+        debug("store unavailable", turn=data.turn_id, reason="no api key")
         return 0  # search surfaces a missing key/SDK immediately; nothing to wake about here
 
     user_id = get_user_id()
     if not user_id:
-        debug("store unavailable", turn=turn, reason="no identity")
+        debug("store unavailable", turn=data.turn_id, reason="no identity")
         return 0  # search surfaces missing identity immediately
 
     try:
-        properties, _user_required, _unmapped = resolve_scope(
-            data.get("cwd", ""), data.get("session_id", "")
-        )
+        properties, _user_required, _unmapped = resolve_scope(data.cwd, data.session_id)
         added = client.memories.add(messages, user_id=user_id, properties=properties or None)
     except Exception as e:
         sys.stderr.write(
@@ -66,5 +61,5 @@ def run(assistant: Assistant) -> int:
         )
         return assistant.STORE_FAILURE_EXIT
 
-    debug("store", turn=turn, run_id=getattr(added, "run_id", None))
+    debug("store", turn=data.turn_id, run_id=getattr(added, "run_id", None))
     return 0

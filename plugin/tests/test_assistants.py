@@ -4,6 +4,7 @@
 """
 
 import importlib
+import io
 import json
 import os
 import pathlib
@@ -11,12 +12,13 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import unittest.mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from assistants.claude_code import ClaudeCode  # noqa: E402
 from assistants.codex import Codex  # noqa: E402
-from core.assistant import Assistant  # noqa: E402
+from core.classes import Assistant, InputData  # noqa: E402
 
 CLAUDE_CODE = ClaudeCode()
 CODEX = Codex()
@@ -36,6 +38,11 @@ def _every_assistant():
 
 
 EVERY_ASSISTANT = _every_assistant()
+
+
+def read(assistant, payload):
+    with unittest.mock.patch.object(sys, "stdin", io.StringIO(json.dumps(payload))):
+        return assistant.read_input()
 
 
 def prompt(text, prompt_id, kind="human"):
@@ -72,11 +79,11 @@ class TranscriptFixture(unittest.TestCase):
 
 class ClaudeCodeTest(TranscriptFixture):
     def payload(self, prompt_id, path=None):
-        return {"prompt_id": prompt_id, "transcript_path": path or self.path}
+        return InputData(turn_id=prompt_id, transcript_path=path or self.path)
 
-    def test_turn_id(self):
-        self.assertEqual(CLAUDE_CODE.turn_id({"prompt_id": "a"}), "a")
-        self.assertEqual(CLAUDE_CODE.turn_id({}), "")
+    def test_turn_id_is_the_prompt_id(self):
+        self.assertEqual(read(CLAUDE_CODE, {"prompt_id": "a"}).turn_id, "a")
+        self.assertEqual(read(CLAUDE_CODE, {"turn_id": "t1"}).turn_id, "")
 
     def test_reads_the_assistants_label(self):
         self.write([prompt("fix the scope config", "a"), prompt("…", "b", "task-notification")])
@@ -93,7 +100,7 @@ class ClaudeCodeTest(TranscriptFixture):
             self.payload("missing"),
             self.payload("a", "/nonexistent"),
             self.payload("a", os.path.dirname(__file__)),
-            {"transcript_path": self.path},
+            InputData(transcript_path=self.path),
         ):
             self.assertFalse(CLAUDE_CODE.is_automated(payload), payload)
 
@@ -102,19 +109,6 @@ class ClaudeCodeTest(TranscriptFixture):
         with open(self.path, "a") as f:
             f.write("{not json\n")
         self.assertTrue(CLAUDE_CODE.is_automated(self.payload("a")))
-
-    def test_an_assistant_can_move_the_transcript_without_reimplementing_the_walk(self):
-        """The payload key is the assistant's to name, so changing it must not force a copy of
-        the JSONL reader."""
-
-        class Elsewhere(ClaudeCode):
-            def transcript_path(self, payload):
-                return payload.get("rollout")
-
-        self.write([prompt("fix the scope config", "a")])
-        self.assertEqual(
-            Elsewhere().last_user_text({"rollout": self.path}), "fix the scope config"
-        )
 
     def test_last_user_text(self):
         self.write([prompt("fix the scope config", "a")])
@@ -130,32 +124,34 @@ def rollout_message(role, text, kind="input_text"):
 
 class CodexTest(TranscriptFixture):
     def test_turn_id_uses_its_own_field(self):
-        self.assertEqual(CODEX.turn_id({"turn_id": "t1"}), "t1")
-        self.assertEqual(CODEX.turn_id({"prompt_id": "a"}), "")
+        self.assertEqual(read(CODEX, {"turn_id": "t1"}).turn_id, "t1")
+        self.assertEqual(read(CODEX, {"prompt_id": "a"}).turn_id, "")
 
     def test_every_turn_counts_as_human(self):
         """Codex documents no provenance field, so nothing is skipped."""
-        self.assertFalse(CODEX.is_automated({"turn_id": "t1"}))
+        self.assertFalse(CODEX.is_automated(InputData(turn_id="t1")))
 
     def test_reads_its_own_rollout_shape(self):
         """Codex wraps messages in `payload` and uses input_text blocks, so the Claude Code
         parser returns nothing for it."""
         self.write([rollout_message("user", "fix the scope config")])
         self.assertEqual(
-            CODEX.last_user_text({"transcript_path": self.path}), "fix the scope config"
+            CODEX.last_user_text(InputData(transcript_path=self.path)), "fix the scope config"
         )
-        self.assertEqual(CLAUDE_CODE.last_user_text({"transcript_path": self.path}), "")
+        self.assertEqual(CLAUDE_CODE.last_user_text(InputData(transcript_path=self.path)), "")
 
     def test_skips_injected_developer_context(self):
         self.write(
             [rollout_message("user", "the real prompt"),
              rollout_message("developer", "injected context nobody typed")]
         )
-        self.assertEqual(CODEX.last_user_text({"transcript_path": self.path}), "the real prompt")
+        self.assertEqual(
+            CODEX.last_user_text(InputData(transcript_path=self.path)), "the real prompt"
+        )
 
     def test_missing_transcript(self):
-        self.assertEqual(CODEX.last_user_text({}), "")
-        self.assertEqual(CODEX.last_user_text({"transcript_path": "/nonexistent"}), "")
+        self.assertEqual(CODEX.last_user_text(InputData()), "")
+        self.assertEqual(CODEX.last_user_text(InputData(transcript_path="/nonexistent")), "")
 
     def test_survives_invalid_utf8(self):
         """A transcript read while it is being written can split a UTF-8 sequence. The bad line
@@ -163,15 +159,25 @@ class CodexTest(TranscriptFixture):
         good = json.dumps(rollout_message("user", "survived")).encode()
         with open(self.path, "wb") as f:
             f.write(b"\xff\xfe broken\n" + good + b"\n")
-        self.assertEqual(CODEX.last_user_text({"transcript_path": self.path}), "survived")
+        self.assertEqual(CODEX.last_user_text(InputData(transcript_path=self.path)), "survived")
 
     def test_a_rewritten_transcript_is_re_read(self):
         """The file read is cached because a hook walks it more than once per turn, so the cache
         has to notice the same path holding different content."""
         self.write([rollout_message("user", "first")])
-        self.assertEqual(CODEX.last_user_text({"transcript_path": self.path}), "first")
+        self.assertEqual(CODEX.last_user_text(InputData(transcript_path=self.path)), "first")
         self.write([rollout_message("user", "second")])
-        self.assertEqual(CODEX.last_user_text({"transcript_path": self.path}), "second")
+        self.assertEqual(CODEX.last_user_text(InputData(transcript_path=self.path)), "second")
+
+
+class ReadInputTest(unittest.TestCase):
+    def test_takes_the_fields_it_names_and_ignores_the_rest(self):
+        """Hosts send more than the hooks use, and each event only a subset."""
+        for assistant in EVERY_ASSISTANT:
+            data = read(assistant, {"hook_event_name": "Stop", "cwd": "/repo", "prompt": None})
+            self.assertEqual(data.cwd, "/repo", assistant.NAME)
+            self.assertEqual(data.prompt, "", assistant.NAME)
+            self.assertFalse(data.stop_hook_active, assistant.NAME)
 
 
 class WiringTest(unittest.TestCase):
