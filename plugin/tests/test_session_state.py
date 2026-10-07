@@ -63,6 +63,26 @@ class SessionStateTest(unittest.TestCase):
         self.assertEqual(session_state.load("recent", "own"), {"a"})
         self.assertEqual(session_state.load(SESSION, "shown"), {"b"})
 
+    def test_clean_carries_on_past_a_file_it_cannot_remove(self):
+        """Another session's cleanup can delete a file first, and a stray entry must not stop
+        every cleanup after it."""
+        stale = time.time() - session_state.MAX_AGE_SECONDS - 60
+        for name in ("a", "b", "c"):
+            session_state.add(name, "own", ["x"])
+            os.utime(os.path.join(self.data, "sessions", f"{name}.own"), (stale, stale))
+        remove, calls = os.remove, []
+
+        def remove_all_but_the_first(path):
+            calls.append(path)
+            if len(calls) == 1:
+                raise FileNotFoundError(path)
+            remove(path)
+
+        with unittest.mock.patch.object(session_state.os, "remove", remove_all_but_the_first):
+            session_state.clean()
+
+        self.assertEqual(len(os.listdir(os.path.join(self.data, "sessions"))), 1)
+
     def test_clean_with_nothing_to_clean_does_not_raise(self):
         session_state.clean()
         with unittest.mock.patch.dict(os.environ, {"CLAUDE_PLUGIN_DATA": ""}):

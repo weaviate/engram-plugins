@@ -49,13 +49,17 @@ def add(session_id: str, kind: str, ids: Iterable[str]) -> None:
 def clean() -> None:
     try:
         folder = os.path.join(data_dir(), "sessions")
-        cutoff = time.time() - MAX_AGE_SECONDS
-        for name in os.listdir(folder):
-            path = os.path.join(folder, name)
+        names = os.listdir(folder)
+    except Exception:
+        return
+    cutoff = time.time() - MAX_AGE_SECONDS
+    for name in names:
+        path = os.path.join(folder, name)
+        try:
             if os.path.getmtime(path) < cutoff:
                 os.remove(path)
-    except Exception:
-        pass
+        except OSError:
+            continue
 
 
 def reset(session_id: str, kind: str) -> None:
