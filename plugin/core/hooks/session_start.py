@@ -68,14 +68,14 @@ def run(assistant: Assistant) -> int:
             retrieval_config=FetchRetrieval(limit=FETCH_LIMIT),
             properties=properties,
         )
+        newest_first = sorted(
+            (m for m in results if m.content), key=lambda m: m.created_at, reverse=True
+        )
     except Exception as e:
         debug("session start failed", source=data.get("source"), error=e)
         emit_status(f"loading memories at session start failed: {e}")
         return 0
 
-    newest_first = sorted(
-        (m for m in results if m.content), key=lambda m: m.created_at, reverse=True
-    )
     injected, text = _fit(newest_first)
 
     debug(
