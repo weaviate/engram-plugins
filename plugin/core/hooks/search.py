@@ -115,11 +115,8 @@ def run(assistant: Assistant) -> int:
         if _already_shown(m, shown):
             skipped_shown += 1
             continue
-        content = getattr(m, "content", None)
-        if content is None and isinstance(m, dict):
-            content = m.get("content")
-        if content:
-            memories.append(str(content).strip())
+        if m.content:
+            memories.append(m.content.strip())
             injected_ids.append(m.id)
 
     bullets = "\n".join(f"- {m}" for m in memories)
