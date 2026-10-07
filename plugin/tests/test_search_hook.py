@@ -103,14 +103,17 @@ class SearchHookTest(unittest.TestCase):
         self.assertNotIn("fact a", context)
         self.assertIn("fact c", context)
 
-    def test_after_compaction_shown_memories_return(self):
-        """Compaction drops injected context, so dedup must not outlive it."""
-        self.results = [memory("a", "fact a")]
-        self.injected()
+    def test_after_compaction_shown_and_own_memories_return(self):
+        """Compaction drops injected context and the turns that wrote own memories alike."""
+        session_state.add(SESSION, "own", ["written"])
+        self.results = [memory("a", "fact a"), memory("written", "fact written here")]
+        self.assertNotIn("fact written here", self.injected())
         payload = {"session_id": SESSION, "trigger": "auto"}
         with unittest.mock.patch.object(sys, "stdin", io.StringIO(json.dumps(payload))):
             self.assertEqual(post_compact.run(ClaudeCode()), 0)
-        self.assertIn("fact a", self.injected())
+        context = self.injected()
+        self.assertIn("fact a", context)
+        self.assertIn("fact written here", context)
 
 
 if __name__ == "__main__":

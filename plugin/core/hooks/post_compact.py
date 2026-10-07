@@ -1,6 +1,6 @@
-"""PostCompact hook: compaction drops the memories injected so far from the assistant's context, so
-forget they were shown and let search inject them again. Memories this session wrote stay
-excluded."""
+"""PostCompact hook: compaction replaces the conversation with a summary, which loses both the
+memories injected so far and the turns this session's own memories came from. Forget both, so
+search can bring them back."""
 
 from core import debug, read_input, session_state
 from core.assistant import Assistant
@@ -8,6 +8,8 @@ from core.assistant import Assistant
 
 def run(assistant: Assistant) -> int:
     data = read_input()
-    session_state.reset(data.get("session_id", ""), "shown")
-    debug("shown reset", turn=assistant.turn_id(data), trigger=data.get("trigger"))
+    session_id = data.get("session_id", "")
+    session_state.reset(session_id, "shown")
+    session_state.reset(session_id, "own")
+    debug("session state reset", turn=assistant.turn_id(data), trigger=data.get("trigger"))
     return 0
