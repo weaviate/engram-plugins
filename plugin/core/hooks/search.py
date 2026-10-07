@@ -136,6 +136,7 @@ def run(assistant: Assistant) -> int:
     session_state.add(data.session_id, "shown", injected_ids)
     return 0
 
+
 def _tag(message):
     return f"Engram · {message}"
 
