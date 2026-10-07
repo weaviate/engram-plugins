@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from assistants.claude_code import ClaudeCode  # noqa: E402
 from assistants.codex import Codex  # noqa: E402
 from core.assistant import Assistant  # noqa: E402
+from core.hooks import HOOKS  # noqa: E402
 
 CLAUDE_CODE = ClaudeCode()
 CODEX = Codex()
@@ -234,6 +235,7 @@ class WiringTest(unittest.TestCase):
             self.assertTrue(commands, assistant.NAME)
             for command in commands:
                 self.assertIn(f"-m {module} ", command)
+                self.assertIn(command.split()[-1], HOOKS, command)
 
     def test_the_manifests_agree_on_the_version(self):
         """One plugin shipped to several assistants. Nothing else keeps these in step, and the

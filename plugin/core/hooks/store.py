@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Stop hook: store the completed turn — user message + assistant's answer — in
-Engram as an OpenAI-format conversation.
+Engram as an OpenAI-format conversation, then wait briefly for the run to commit and record the
+memory ids it wrote, so search can leave this session's own memories out.
 
 Success is silent. A store failure writes to stderr and exits with the assistant's own
 STORE_FAILURE_EXIT, because the same code means opposite things: Claude Code wakes and reports
@@ -9,6 +10,7 @@ wakes every turn and fixing the cause silences it; the stop_hook_active guard ke
 looping."""
 
 import sys
+import time
 
 from core import (
     debug,
@@ -16,8 +18,12 @@ from core import (
     get_user_id,
     read_input,
     resolve_scope,
+    session_state,
 )
 from core.assistant import Assistant
+
+# A run commits in ~12s. Search cannot recognise what a run still uncommitted after this wrote.
+OWN_POLL_SECONDS = 20
 
 
 def run(assistant: Assistant) -> int:
@@ -66,5 +72,31 @@ def run(assistant: Assistant) -> int:
         )
         return assistant.STORE_FAILURE_EXIT
 
-    debug("store", turn=turn, run_id=getattr(added, "run_id", None))
+    debug("store", turn=turn, run_id=added.run_id)
+
+    # Hook runs in background (asyncRewake: True), waiting and polling for the run
+    # here does not block future interactions
+    try:
+        status = _wait_for_run_including_buffer(client, added.run_id)
+    except Exception as e:
+        debug("store poll failed", turn=turn, run_id=added.run_id, error=e)
+        return 0
+    ids = [op.memory_id for op in (*status.memories_created, *status.memories_updated)]
+
+    session_state.add(data.get("session_id", ""), "own", ids)
+    debug("store settled", turn=turn, status=status.status, own=len(ids))
     return 0
+
+
+def _wait_for_run_including_buffer(client, run_id):
+    """Essentially runs.wait but including `in_buffer` state as settled."""
+    deadline = time.monotonic() + OWN_POLL_SECONDS
+    while True:
+        status = client.runs.get(run_id)
+        if (
+            status.status in ("completed", "failed", "in_buffer")
+            or time.monotonic() >= deadline
+        ):
+            return status
+        time.sleep(1)
+

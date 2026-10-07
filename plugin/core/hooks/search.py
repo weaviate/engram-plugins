@@ -4,10 +4,12 @@ additionalContext for the assistant to use. Recalled memories are injected silen
 warnings/errors ride in the model's reply (additionalContext directive), not a hook
 `systemMessage`, so they render in every host.
 
-Stateless — no per-session files. Success is silent. Warnings/errors are scoped to the current
+Skips memories already in context. Success is silent. Warnings/errors are scoped to the current
 reply and persist by being re-injected each turn, so a fixed problem stops showing on its own."""
 
 import json
+
+from engram import Memory
 
 from core import (
     debug,
@@ -16,12 +18,9 @@ from core import (
     get_user_id,
     read_input,
     search_filters,
+    session_state,
 )
 from core.assistant import Assistant
-
-
-def tag(message):
-    return f"Engram · {message}"
 
 
 def emit(status=None, memories=None):
@@ -73,12 +72,12 @@ def run(assistant: Assistant) -> int:
     warning = engram_warning()
     if warning:
         debug("search unavailable", turn=turn, reason=warning)
-        emit(status=[tag(warning)])
+        emit(status=[_tag(warning)])
         return 0
 
     client = get_client(assistant.NAME)
     if client is None:
-        emit(status=[tag("client unavailable.")])
+        emit(status=[_tag("client unavailable.")])
         return 0
 
     user_id = get_user_id()
@@ -92,21 +91,55 @@ def run(assistant: Assistant) -> int:
         )
     except Exception as e:
         debug("search failed", turn=turn, error=e)
-        emit(status=[tag(f"search failed: {e}")])
+        emit(status=[_tag(f"search failed: {e}")])
         return 0
 
-    memories = []
+    own = session_state.load(session_id, "own")
+    shown = session_state.load(session_id, "shown")
+    memories, injected_ids, skipped_own, skipped_shown = [], [], 0, 0
     for m in results:
+        if _written_this_session(m, session_id, own):
+            skipped_own += 1
+            continue
+        if _already_shown(m, shown):
+            skipped_shown += 1
+            continue
         content = getattr(m, "content", None)
         if content is None and isinstance(m, dict):
             content = m.get("content")
         if content:
             memories.append(str(content).strip())
+            injected_ids.append(m.id)
 
     bullets = "\n".join(f"- {m}" for m in memories)
 
-    debug("search", turn=turn, injected=len(memories), chars=len(bullets))
+    debug(
+        "search",
+        turn=turn,
+        injected=len(memories),
+        own=skipped_own,
+        shown=skipped_shown,
+        chars=len(bullets),
+    )
 
     # Success is silent: warnings (if any) show this reply; memories are injected as context.
-    emit(status=[tag(w) for w in warnings] or None, memories=bullets or None)
+    emit(status=[_tag(w) for w in warnings] or None, memories=bullets or None)
+    session_state.add(session_id, "shown", injected_ids)
     return 0
+
+def _tag(message):
+    return f"Engram · {message}"
+
+
+def _written_this_session(memory: Memory, session_id: str, own: set[str]) -> bool:
+    """The ids the store hook recorded cover every topic. The session_id property covers
+    session-scoped topics when the store hook missed a run."""
+    if memory.id in own:
+        return True
+    properties = memory.properties or {}
+    return bool(session_id) and properties.get("session_id") == session_id
+
+
+def _already_shown(memory: Memory, shown: set[str]) -> bool:
+    """Injected context stays in the conversation, so the assistant still has it."""
+    return memory.id in shown
