@@ -1,6 +1,7 @@
 """Config from JSON files: ~/.engram/config.json (global) plus the current directory's
-.engram.json. Holds scope `properties` (how each value resolves) and `search` (which
-topics/properties to filter). No env vars, no shell quoting — structured config lives in files."""
+.engram.json. Holds scope `properties` (how each value resolves), `search` (which
+topics/properties to filter) and `session_start` (which topic to inject). No env vars, no shell
+quoting — structured config lives in files."""
 
 import json
 import os
@@ -45,13 +46,14 @@ def _contains_cmd(value):
 
 def load_config(cwd):
     """Merge config from the global ~/.engram/config.json and the current directory's .engram.json
-    (cwd overrides). `properties` merge key-wise; `search` takes the deepest defined block.
+    (cwd overrides). `properties` merge key-wise; `search` and `session_start` each take the
+    deepest defined block.
 
     `cmd` sources run an arbitrary command, so they're honored ONLY from the global config
     (user-owned) — a repo you clone must never run a command on your machine via a hook. Literals
     and `from` tokens (fixed built-in lookups, no arbitrary execution) are fine in a committed
     .engram.json. A `cmd` found in a local file is dropped and reported in `warnings`."""
-    cfg = {"properties": {}, "search": {}, "warnings": []}
+    cfg = {"properties": {}, "search": {}, "session_start": {}, "warnings": []}
     for i, path in enumerate(_config_chain(cwd)):
         part = _read_json(path)
         is_global = i == 0  # first entry is the global config; the rest are local/committed
@@ -74,4 +76,6 @@ def load_config(cwd):
                     cfg["properties"][k] = str(v)
         if isinstance(part.get("search"), dict):
             cfg["search"] = part["search"]
+        if isinstance(part.get("session_start"), dict):
+            cfg["session_start"] = part["session_start"]
     return cfg
