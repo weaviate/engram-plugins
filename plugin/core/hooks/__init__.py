@@ -6,9 +6,14 @@ from collections.abc import Callable, Sequence
 
 from core.assistant import Assistant
 
-from . import search, store
+from . import post_compact, search, session_start, store
 
-HOOKS: dict[str, Callable[[Assistant], int]] = {"search": search.run, "store": store.run}
+HOOKS: dict[str, Callable[[Assistant], int]] = {
+    "session_start": session_start.run,
+    "search": search.run,
+    "store": store.run,
+    "post_compact": post_compact.run,
+}
 
 
 def dispatch(assistant: Assistant, argv: Sequence[str]) -> int:

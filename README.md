@@ -4,7 +4,8 @@ Persistent, cross-session memory for **Claude Code**, backed by
 [Weaviate Engram](https://docs.weaviate.io/engram). Claude remembers your preferences,
 decisions, and project context across sessions — and recalls what's relevant before it answers.
 
-- **Recall** — before each answer, relevant memories are fetched and added to the conversation.
+- **Recall** — before each answer, relevant memories are fetched and added to the conversation,
+  leaving out what the current session saved, which Claude already has.
 - **Store** — after each turn, the exchange is saved so it can be recalled later.
 
 Memory is best-effort: it never blocks or breaks a session. When something needs your attention

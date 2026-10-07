@@ -1,5 +1,17 @@
 {
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${PLUGIN_ROOT}/hooks/with-venv.sh\" -m assistants.codex session_start",
+            "statusMessage": "Starting Engram…"
+          }
+        ]
+      }
+    ],
     "UserPromptSubmit": [
       {
         "matcher": "",
@@ -21,6 +33,17 @@
             "command": "bash \"${PLUGIN_ROOT}/hooks/with-venv.sh\" -m assistants.codex store",
             "async": true,
             "statusMessage": "Saving memory to Engram…"
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${PLUGIN_ROOT}/hooks/with-venv.sh\" -m assistants.codex post_compact"
           }
         ]
       }
