@@ -64,9 +64,6 @@ Global `~/.engram/config.json`:
       { "name": "product_knowledge", "properties": ["product"] },
       { "name": "change_summary", "clear_properties": ["codebase"] }
     ]
-  },
-  "session_start": {
-    "topic": "tooling_preferences"
   }
 }
 ```
@@ -109,13 +106,19 @@ The JSON **shape** decides — no ambiguity:
 
 ### Session start
 
-- `session_start.topic` — the topic loaded in full when a session starts (and again after a
-  compaction), rather than recalled per answer. `null` turns it off.
+With the default (quickstart) Engram project, your `DeveloperPreferences` memory is loaded when a
+session starts and again after a compaction, and recall before each answer leaves it out. No
+configuration needed.
 
-Any topic works, but a **bounded** topic is recommended. Engram keeps a single memory per scope in
-a bounded topic and keeps rewriting it as it learns, so the session starts with one current
-memory. An unbounded topic is loaded newest first until the size budget runs out, and the rest
-is left to per-answer recall.
+`session_start.topic` loads a different topic instead, and `null` turns it off:
+
+```json
+{ "session_start": { "topic": "my_preferences" } }
+```
+
+Any topic works, but a **bounded** topic is recommended: Engram keeps one memory per scope in it
+and rewrites that memory as it learns, as it does for `DeveloperPreferences`. An unbounded topic
+loads as many memories as fit, chosen from at most 100, so it only suits a small topic.
 
 ### Inferred configuration
 
@@ -124,9 +127,7 @@ With the default Engram project (quickstart) configuration, properties are infer
 - `repo_name` → `git-repo`, then `cwd` (in that order)
 - `session_id` → `session_id` from the assistant
 
-and search is narrowed to the `repo_name` property. If your project has a `DeveloperPreferences`
-topic (bounded, in the quickstart setup), it is the session start topic. You can still use
-`.engram.json` to change this inferred behaviour.
+and search is narrowed to the `repo_name` property. You can still use `.engram.json` to change this inferred behaviour.
 
 ## Migrating from another memory system
 
