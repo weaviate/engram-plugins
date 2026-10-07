@@ -1,24 +1,25 @@
-from core.classes import Assistant, InputData
+from typing import Any
+
+from core.classes import Assistant, TranscriptEntry
 
 
 class Codex(Assistant):
     NAME = "codex"
     MANIFEST_DIR = ".codex-plugin"
 
-    def last_user_text(self, payload: InputData) -> str:
+    def read_entry(self, raw: dict[str, Any]) -> TranscriptEntry | None:
         """Rollout entries wrap a message in `payload`, and use a `developer` role for injected
         context nobody typed."""
-        for entry in self.transcript(payload):
-            message = entry.get("payload") or {}
-            if message.get("type") != "message" or message.get("role") != "user":
-                continue
-            blocks = message.get("content") or []
-            text = "\n".join(
+        message = raw.get("payload") or {}
+        if message.get("type") != "message":
+            return None
+        blocks = message.get("content") or []
+        return TranscriptEntry(
+            role=message.get("role", ""),
+            text="\n".join(
                 b["text"] for b in blocks if isinstance(b, dict) and b.get("text")
-            ).strip()
-            if text:
-                return text
-        return ""
+            ).strip(),
+        )
 
 
 if __name__ == "__main__":

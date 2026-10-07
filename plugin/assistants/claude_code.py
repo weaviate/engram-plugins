@@ -2,7 +2,7 @@ import json
 import sys
 from typing import Any
 
-from core.classes import Assistant, InputData
+from core.classes import Assistant, InputData, TranscriptEntry
 
 
 class ClaudeCode(Assistant):
@@ -14,17 +14,15 @@ class ClaudeCode(Assistant):
         payload = json.load(sys.stdin)
         return InputData.from_payload({**payload, "turn_id": payload.get("prompt_id")})
 
-    def last_user_text(self, payload: InputData) -> str:
-        for entry in self.transcript(payload):
-            if entry.get("type") != "user":
-                continue
-            content = entry.get("message", entry).get("content")
-            if _is_tool_only(content):
-                continue
-            text = _text(content)
-            if text:
-                return text
-        return ""
+    def read_entry(self, raw: dict[str, Any]) -> TranscriptEntry:
+        content = raw.get("message", raw).get("content")
+        origin = raw.get("origin")
+        return TranscriptEntry(
+            role=raw.get("type", ""),
+            text="" if _is_tool_only(content) else _text(content),
+            turn_id=raw.get("promptId", ""),
+            origin=origin.get("kind", "") if isinstance(origin, dict) else "",
+        )
 
     def is_automated(self, payload: InputData) -> bool:
         # An unrecognised origin counts as human.
@@ -38,11 +36,8 @@ class ClaudeCode(Assistant):
         for entry in self.transcript(payload):
             # Tool results inherit the promptId of the prompt that spawned them and carry no
             # origin, so keep scanning past them for the entry that has one.
-            if entry.get("promptId") == prompt_id:
-                origin = entry.get("origin")
-                kind = origin.get("kind") if isinstance(origin, dict) else None
-                if kind:
-                    return str(kind)
+            if entry.turn_id == prompt_id and entry.origin:
+                return entry.origin
         return None
 
 

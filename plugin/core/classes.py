@@ -31,6 +31,16 @@ class InputData:
         )
 
 
+@dataclass
+class TranscriptEntry:
+    """A transcript line under one set of names, whichever assistant wrote it."""
+
+    role: str
+    text: str
+    turn_id: str = ""
+    origin: str = ""
+
+
 @lru_cache(maxsize=2)
 def _lines(transcript_path: str, mtime: int, size: int) -> tuple[str, ...]:
     """Keyed on the file's identity so a rewritten transcript is re-read. A turn walks the
@@ -57,15 +67,22 @@ class Assistant(ABC):
         return InputData.from_payload(json.load(sys.stdin))
 
     @abstractmethod
+    def read_entry(self, raw: dict[str, Any]) -> TranscriptEntry | None:
+        """One line of this assistant's transcript, or None for a line that holds no message."""
+
     def last_user_text(self, payload: InputData) -> str:
         """The most recent message a person sent, or "" when none can be read."""
+        for entry in self.transcript(payload):
+            if entry.role == "user" and entry.text:
+                return entry.text
+        return ""
 
     def is_automated(self, payload: InputData) -> bool:
         """Whether the assistant started this turn rather than a person. An assistant that
         records no provenance keeps this default: losing the skip beats dropping a real turn."""
         return False
 
-    def transcript(self, payload: InputData) -> Iterator[dict[str, Any]]:
+    def transcript(self, payload: InputData) -> Iterator[TranscriptEntry]:
         """Transcript entries, newest first. Both assistants write JSONL; one that doesn't can
         override this. An unreadable file or line yields nothing rather than raising, because a
         hook must not break a session over a transcript it cannot parse."""
@@ -77,6 +94,8 @@ class Assistant(ABC):
             return
         for line in reversed(_lines(payload.transcript_path, stat.st_mtime_ns, stat.st_size)):
             try:
-                yield json.loads(line)
+                entry = self.read_entry(json.loads(line))
             except Exception:
                 continue
+            if entry is not None:
+                yield entry
