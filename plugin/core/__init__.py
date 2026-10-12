@@ -15,7 +15,7 @@ from .client import (
 from .config import load_config, user_config_path
 from .scope import resolve_scope, scope_schema
 from .search import search_filters
-from .util import data_dir, debug
+from .util import debug
 
 __all__ = [
     "engram_api_key",
@@ -29,6 +29,5 @@ __all__ = [
     "resolve_scope",
     "scope_schema",
     "search_filters",
-    "data_dir",
     "debug",
 ]

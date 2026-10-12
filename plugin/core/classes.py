@@ -47,10 +47,19 @@ def _lines(transcript_path: str, mtime: int, size: int) -> tuple[str, ...]:
 class Assistant(ABC):
     NAME: str
     MANIFEST_DIR: str
+    DATA_DIR_ENV: str  # the host's variable for the plugin's writable data dir
 
     # Exit code for a failed store. Claude Code turns 2 into a wake carrying our stderr, but Codex
     # reads it as "continue the turn, using stderr as the prompt", so an assistant has to opt in.
     STORE_FAILURE_EXIT: int = 0
+
+    def data_dir(self) -> str:
+        """No fallback on purpose: a guessed path diverges from the one with-venv.sh builds the
+        venv in, and makes bugs untraceable."""
+        path = os.environ.get(self.DATA_DIR_ENV)
+        if not path:
+            raise RuntimeError(f"{self.DATA_DIR_ENV} not set — the host provides the data dir")
+        return path
 
     @abstractmethod
     def read_input(self) -> InputData:

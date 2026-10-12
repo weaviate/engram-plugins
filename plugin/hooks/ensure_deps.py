@@ -35,21 +35,16 @@ CANDIDATES = (
 
 
 def _plugin_root():
-    # Host-provided (with-venv.sh, our only caller, guarantees it). No fallback: fail loudly
-    # rather than guess.
-    d = os.environ.get("CLAUDE_PLUGIN_ROOT")
-    if not d:
-        sys.stderr.write("Engram · CLAUDE_PLUGIN_ROOT not set\n")
-        sys.exit(1)
-    return d
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def _data_dir():
-    # Host-provided; no fallback (a guessed path diverges from where the hooks read). with-venv.sh
-    # already guards this, but fail loudly here too if somehow run without it.
-    d = os.environ.get("CLAUDE_PLUGIN_DATA")
+    # Passed by with-venv.sh, our only caller; no fallback (a guessed path diverges from where
+    # the hooks read). with-venv.sh already guards this, but fail loudly here too if somehow run
+    # without it.
+    d = sys.argv[1] if len(sys.argv) > 1 else ""
     if not d:
-        sys.stderr.write("Engram · CLAUDE_PLUGIN_DATA not set\n")
+        sys.stderr.write("Engram · usage: ensure_deps.py <plugin data dir>\n")
         sys.exit(1)
     return d
 

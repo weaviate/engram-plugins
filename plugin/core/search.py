@@ -47,7 +47,7 @@ def _build_topics(spec, resolved):
     return (out or None), None
 
 
-def search_filters(cwd, session_id):
+def search_filters(cwd, session_id, data_dir):
     """Mirror the Engram search API's two independent, composable filters, read from the
     config `search` block. Both name only property KEYS; values come from the same
     resolution used when adding memories (resolve_scope).
@@ -67,7 +67,7 @@ def search_filters(cwd, session_id):
     won't be attached)."""
     cfg = load_config(cwd)
     search = cfg.get("search") or {}
-    resolved, _user_required, unmapped = resolve_scope(cwd, session_id)
+    resolved, _user_required, unmapped = resolve_scope(cwd, session_id, data_dir)
     prop_keys = (
         search["properties"] if "properties" in search else DEFAULT_SEARCH_PROPERTIES
     )

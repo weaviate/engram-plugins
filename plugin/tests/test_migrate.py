@@ -502,7 +502,7 @@ class PropsBuilderTest(unittest.TestCase):
     SCHEMA = {"properties": ["repo_name", "session_id"]}
 
     def test_resolution_error_skips_project_instead_of_crashing(self):
-        def broken(cwd, marker):
+        def broken(cwd, marker, data_dir):
             raise ValueError("invalid JSON in .engram.json")
 
         with unittest.mock.patch("core.scope.resolve_scope", broken):
@@ -513,10 +513,11 @@ class PropsBuilderTest(unittest.TestCase):
             self.assertIsNone(props_for("proj"))
 
     def test_resolved_props_flow_through_with_map_and_extra(self):
-        def ok(cwd, marker):
+        def ok(cwd, marker, data_dir):
             return {"repo_name": "acme/from-git", "session_id": marker}, True, []
 
-        with unittest.mock.patch("core.scope.resolve_scope", ok):
+        with unittest.mock.patch("core.scope.resolve_scope", ok), \
+                unittest.mock.patch.dict(os.environ, {"CLAUDE_PLUGIN_DATA": "/unused"}):
             from core.migrate.__main__ import _props_builder
 
             props_for = _props_builder(self.SCHEMA, "claude-mem",

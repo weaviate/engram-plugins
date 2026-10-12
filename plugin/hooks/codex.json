@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${PLUGIN_ROOT}/hooks/with-venv.sh\" -m assistants.codex search",
+            "command": "bash \"${PLUGIN_ROOT}/hooks/with-venv.sh\" \"${PLUGIN_DATA}\" -m assistants.codex search",
             "statusMessage": "Recalling memories from Engram…"
           }
         ]
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${PLUGIN_ROOT}/hooks/with-venv.sh\" -m assistants.codex store",
+            "command": "bash \"${PLUGIN_ROOT}/hooks/with-venv.sh\" \"${PLUGIN_DATA}\" -m assistants.codex store",
             "async": true,
             "statusMessage": "Saving memory to Engram…"
           }

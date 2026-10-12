@@ -8,6 +8,7 @@ from core.classes import Assistant, InputData, TranscriptEntry
 class Codex(Assistant):
     NAME = "codex"
     MANIFEST_DIR = ".codex-plugin"
+    DATA_DIR_ENV = "PLUGIN_DATA"
 
     def read_input(self) -> InputData:
         payload = json.load(sys.stdin)

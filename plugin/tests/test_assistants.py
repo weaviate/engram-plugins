@@ -240,6 +240,8 @@ class WiringTest(unittest.TestCase):
             self.assertTrue(commands, assistant.NAME)
             for command in commands:
                 self.assertIn(f"-m {module} ", command)
+                # with-venv.sh builds the venv where this says; the hook reads the same variable
+                self.assertIn(f'"${{{assistant.DATA_DIR_ENV}}}"', command)
 
     def test_the_manifests_agree_on_the_version(self):
         """One plugin shipped to several assistants. Nothing else keeps these in step, and the

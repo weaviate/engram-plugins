@@ -1,5 +1,5 @@
-"""Low-level helpers with no intra-package dependencies: debug logging, the data dir, and git
-lookups. Kept dependency-free so config/scope can import it without import cycles."""
+"""Low-level helpers with no intra-package dependencies: debug logging and git lookups. Kept
+dependency-free so config/scope can import it without import cycles."""
 
 import os
 import subprocess
@@ -12,16 +12,6 @@ def debug(event: str, **fields: Any) -> None:
         return
     detail = " ".join(f"{k}={v}" for k, v in fields.items() if v is not None)
     sys.stderr.write(f"Engram · {event} {detail}\n")
-
-
-def data_dir():
-    """Plugin data dir (the venv, the schema cache, and state flags), provided by the host via
-    CLAUDE_PLUGIN_DATA. No fallback on purpose: a guessed path diverges between entry points
-    (hooks vs the setup command) and makes bugs untraceable, so fail loudly if it's not set."""
-    d = os.environ.get("CLAUDE_PLUGIN_DATA")
-    if not d:
-        raise RuntimeError("CLAUDE_PLUGIN_DATA not set — the host provides the plugin data dir")
-    return d
 
 
 def git_out(cwd, args):

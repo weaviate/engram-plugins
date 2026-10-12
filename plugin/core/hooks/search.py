@@ -81,7 +81,9 @@ def run(assistant: Assistant) -> int:
     # Resolving filters reads the scope schema from Engram; that and the search run under one
     # try, so a failure anywhere fails the whole operation with a single error.
     try:
-        topics, properties, warnings = search_filters(data.cwd, data.session_id)
+        topics, properties, warnings = search_filters(
+            data.cwd, data.session_id, assistant.data_dir()
+        )
         kwargs = {"properties": properties} if properties else {}
         results = client.memories.search(
             query=prompt, user_id=user_id, topics=topics, **kwargs

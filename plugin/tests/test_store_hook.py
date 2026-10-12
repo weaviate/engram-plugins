@@ -42,6 +42,7 @@ class StoreHookTest(unittest.TestCase):
             unittest.mock.patch.object(store, "get_client", lambda *_: client),
             unittest.mock.patch.object(store, "get_user_id", lambda: "u@x"),
             unittest.mock.patch.object(store, "resolve_scope", lambda *_: ({}, False, [])),
+            unittest.mock.patch.dict(os.environ, {"CLAUDE_PLUGIN_DATA": self.tmp.name}),
         ):
             patch.start()
             self.addCleanup(patch.stop)

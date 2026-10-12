@@ -8,7 +8,7 @@ import subprocess
 
 from .client import engram_get
 from .config import load_config
-from .util import data_dir, git_repo
+from .util import git_repo
 
 # Built-in defaults for well-known properties — applied only when the live schema lists them and
 # the user didn't configure them. Any other property is the user's to map in .engram.json.
@@ -75,13 +75,13 @@ def _resolve_value(value, cwd, session_id):
     return None
 
 
-def scope_schema():
+def scope_schema(data_dir):
     """The active group's write requirements, fetched from /v1/groups and cached. Only one group
     is supported, so we take the response's default group and pass nothing to the API. The cache
     stores the raw group payload plus the derived `properties` (UNION of every topic's
     scope_properties) and `user` (any topic user-scoped). No expiry — once written it's reused
     (the schema rarely changes); reinstall to refresh it. Raises if the fetch fails and no cache."""
-    cache = os.path.join(data_dir(), "scope-schema.json")
+    cache = os.path.join(data_dir, "scope-schema.json")
     try:
         with open(cache) as f:
             return json.load(f)
@@ -110,7 +110,7 @@ def scope_schema():
     return schema
 
 
-def resolve_scope(cwd, session_id):
+def resolve_scope(cwd, session_id, data_dir):
     """Resolve the scope properties to attach to a memory. Config always wins and is always sent;
     the cached schema's ONLY job is to pick which built-in DEFAULT_SOURCES to infer for properties
     the user didn't configure — it does not gate, require, or limit anything. So a stale schema
@@ -120,7 +120,7 @@ def resolve_scope(cwd, session_id):
     Returns (props, user_required, unmapped) — `unmapped` lists configured/inferred properties that
     didn't resolve to a value, so the user can fix the source."""
     configured = load_config(cwd).get("properties", {})
-    schema = scope_schema()
+    schema = scope_schema(data_dir)
     # Schema → defaults only: infer a DEFAULT_SOURCE for each schema property the user left unset.
     defaults = {
         name: DEFAULT_SOURCES[name]

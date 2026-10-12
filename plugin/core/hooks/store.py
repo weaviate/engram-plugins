@@ -52,7 +52,9 @@ def run(assistant: Assistant) -> int:
         return 0  # search surfaces missing identity immediately
 
     try:
-        properties, _user_required, _unmapped = resolve_scope(data.cwd, data.session_id)
+        properties, _user_required, _unmapped = resolve_scope(
+            data.cwd, data.session_id, assistant.data_dir()
+        )
         added = client.memories.add(messages, user_id=user_id, properties=properties or None)
     except Exception as e:
         sys.stderr.write(
