@@ -76,13 +76,13 @@ def run(assistant: Assistant) -> int:
     try:
         status = _wait_for_run_including_buffer(client, added.run_id)
     except Exception as e:
-        debug("store poll failed", turn=turn, run_id=added.run_id, error=e)
+        debug("store poll failed", turn=data.turn_id, run_id=added.run_id, error=e)
         return 0
     # Not updated ones: a memory this turn merged into is mostly earlier sessions' knowledge.
     ids = [op.memory_id for op in status.memories_created]
 
-    session_state.add(data.get("session_id", ""), "own", ids)
-    debug("store settled", turn=turn, status=status.status, own=len(ids))
+    session_state.add(data.session_id, "own", ids, assistant.data_dir())
+    debug("store settled", turn=data.turn_id, status=status.status, own=len(ids))
     return 0
 
 

@@ -2,14 +2,13 @@
 memories injected so far and the turns this session's own memories came from. Forget both, so
 search can bring them back."""
 
-from core import debug, read_input, session_state
-from core.assistant import Assistant
+from core import debug, session_state
+from core.classes import Assistant
 
 
 def run(assistant: Assistant) -> int:
-    data = read_input()
-    session_id = data.get("session_id", "")
-    session_state.reset(session_id, "shown")
-    session_state.reset(session_id, "own")
-    debug("session state reset", turn=assistant.turn_id(data), trigger=data.get("trigger"))
+    data = assistant.read_input()
+    session_state.reset(data.session_id, "shown", assistant.data_dir())
+    session_state.reset(data.session_id, "own", assistant.data_dir())
+    debug("session state reset", turn=data.turn_id)
     return 0

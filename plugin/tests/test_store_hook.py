@@ -62,6 +62,7 @@ class StoreHookTest(unittest.TestCase):
             runs=SimpleNamespace(get=self.get_run),
         )
         data_dir = os.path.join(self.tmp.name, "data")
+        self.data = data_dir
         for patch in (
             unittest.mock.patch.object(store, "get_client", lambda *_: client),
             unittest.mock.patch.object(store, "get_user_id", lambda: "u@x"),
@@ -114,21 +115,21 @@ class StoreHookTest(unittest.TestCase):
         """A memory this turn merged into is mostly earlier sessions' knowledge, so it stays
         recallable."""
         self.assertEqual(self.run_hook([prompt("fix the scope config", "a")]), 0)
-        self.assertEqual(session_state.load("s", "own"), {"m1"})
+        self.assertEqual(session_state.load("s", "own", self.data), {"m1"})
 
     def test_a_buffered_run_ends_the_poll_at_once(self):
         """in_buffer waits on a trigger that can take minutes, so there is nothing to wait for."""
         self.status = run_status("in_buffer")
         self.assertEqual(self.run_hook([prompt("fix the scope config", "a")]), 0)
         self.assertEqual(self.polls, 1)
-        self.assertEqual(session_state.load("s", "own"), set())
+        self.assertEqual(session_state.load("s", "own", self.data), set())
 
     def test_a_run_still_going_at_the_deadline_is_given_up(self):
         self.status = run_status("running")
         with unittest.mock.patch.object(store, "OWN_POLL_SECONDS", 0):
             self.assertEqual(self.run_hook([prompt("fix the scope config", "a")]), 0)
         self.assertEqual(self.polls, 1)
-        self.assertEqual(session_state.load("s", "own"), set())
+        self.assertEqual(session_state.load("s", "own", self.data), set())
 
     def test_a_failed_poll_is_not_a_failed_store(self):
         """Only a failed add wakes Claude. The turn is saved either way."""

@@ -42,6 +42,7 @@ class SearchHookTest(unittest.TestCase):
         self.search_kwargs = {}
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
+        self.data = tmp.name
         client = SimpleNamespace(memories=SimpleNamespace(search=self.search))
         for patch in (
             unittest.mock.patch.object(search, "engram_warning", lambda: None),
@@ -68,7 +69,7 @@ class SearchHookTest(unittest.TestCase):
         return json.loads(stdout.getvalue())["hookSpecificOutput"]["additionalContext"]
 
     def test_memories_this_session_wrote_are_not_injected(self):
-        session_state.add(SESSION, "own", ["written-here"])
+        session_state.add(SESSION, "own", ["written-here"], self.data)
         self.results = [
             memory("summary", "this session so far", session_id=SESSION),
             memory("written-here", "a process noted earlier this session"),
@@ -83,7 +84,7 @@ class SearchHookTest(unittest.TestCase):
 
     def test_injects_the_top_five_left_after_exclusion(self):
         """Over-fetching is what keeps exclusion from emptying the injection."""
-        session_state.add(SESSION, "shown", ["m0", "m1", "m2"])
+        session_state.add(SESSION, "shown", ["m0", "m1", "m2"], self.data)
         self.results = [memory(f"m{i}", f"fact {i}") for i in range(10)]
         context = self.injected()
         self.assertEqual(self.search_kwargs["retrieval_config"].limit, search.SEARCH_LIMIT)
@@ -105,7 +106,7 @@ class SearchHookTest(unittest.TestCase):
 
     def test_after_compaction_shown_and_own_memories_return(self):
         """Compaction drops injected context and the turns that wrote own memories alike."""
-        session_state.add(SESSION, "own", ["written"])
+        session_state.add(SESSION, "own", ["written"], self.data)
         self.results = [memory("a", "fact a"), memory("written", "fact written here")]
         self.assertNotIn("fact written here", self.injected())
         payload = {"session_id": SESSION, "trigger": "auto"}

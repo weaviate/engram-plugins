@@ -10,8 +10,6 @@ import re
 import time
 from collections.abc import Iterable
 
-from .util import data_dir
-
 # clean() deletes files untouched for this long; the SessionStart hook runs it.
 MAX_AGE_SECONDS = 7 * 24 * 3600
 
@@ -19,26 +17,26 @@ MAX_AGE_SECONDS = 7 * 24 * 3600
 _SESSION_ID = re.compile(r"[A-Za-z0-9_-]{1,128}")
 
 
-def _path(session_id: str, kind: str) -> str:
+def _path(session_id: str, kind: str, data_dir: str) -> str:
     if not _SESSION_ID.fullmatch(session_id or ""):
         raise ValueError(f"unusable session id {session_id!r}")
-    return os.path.join(data_dir(), "sessions", f"{session_id}.{kind}")
+    return os.path.join(data_dir, "sessions", f"{session_id}.{kind}")
 
 
-def load(session_id: str, kind: str) -> set[str]:
+def load(session_id: str, kind: str, data_dir: str) -> set[str]:
     try:
-        with open(_path(session_id, kind)) as f:
+        with open(_path(session_id, kind, data_dir)) as f:
             return set(f.read().split())
     except Exception:
         return set()
 
 
-def add(session_id: str, kind: str, ids: Iterable[str]) -> None:
+def add(session_id: str, kind: str, ids: Iterable[str], data_dir: str) -> None:
     lines = "".join(f"{i}\n" for i in ids)
     if not lines:
         return
     try:
-        path = _path(session_id, kind)
+        path = _path(session_id, kind, data_dir)
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "a") as f:
             f.write(lines)
@@ -46,9 +44,9 @@ def add(session_id: str, kind: str, ids: Iterable[str]) -> None:
         pass
 
 
-def clean() -> None:
+def clean(data_dir: str) -> None:
     try:
-        folder = os.path.join(data_dir(), "sessions")
+        folder = os.path.join(data_dir, "sessions")
         names = os.listdir(folder)
     except Exception:
         return
@@ -62,8 +60,8 @@ def clean() -> None:
             continue
 
 
-def reset(session_id: str, kind: str) -> None:
+def reset(session_id: str, kind: str, data_dir: str) -> None:
     try:
-        os.remove(_path(session_id, kind))
+        os.remove(_path(session_id, kind, data_dir))
     except Exception:
         pass
