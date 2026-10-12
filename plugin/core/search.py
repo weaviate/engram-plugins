@@ -86,13 +86,13 @@ def search_filters(cwd, session_id, data_dir):
     return topics, (cross or None), warnings
 
 
-def session_start_topic(cwd):
+def session_start_topic(cwd, data_dir):
     """The topic injected in full at session start, from config `session_start.topic` (null
     turns it off), else DEFAULT_SESSION_START_TOPIC if the cached schema has it. A bounded topic
     is recommended. Returns (topic, error_message)."""
     session_start = load_config(cwd).get("session_start") or {}
     if "topic" not in session_start:
-        if _schema_has_topic(DEFAULT_SESSION_START_TOPIC):
+        if _schema_has_topic(DEFAULT_SESSION_START_TOPIC, data_dir):
             return DEFAULT_SESSION_START_TOPIC, None
         return None, None
     topic = session_start["topic"]
@@ -101,6 +101,6 @@ def session_start_topic(cwd):
     return (topic or "").strip() or None, None
 
 
-def _schema_has_topic(name):
-    topics = (scope_schema().get("raw") or {}).get("topics") or []
+def _schema_has_topic(name, data_dir):
+    topics = (scope_schema(data_dir).get("raw") or {}).get("topics") or []
     return any(t.get("topic_name") == name for t in topics)

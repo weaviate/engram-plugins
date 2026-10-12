@@ -9,12 +9,11 @@ from core import (
     engram_warning,
     get_client,
     get_user_id,
-    read_input,
     search_filters,
     session_start_topic,
     session_state,
 )
-from core.assistant import Assistant
+from core.classes import Assistant
 
 FETCH_LIMIT = 100  # the most the server returns
 MAX_CHARS = 8000  # Claude Code moves hook output over 10,000 characters to a file
@@ -42,26 +41,24 @@ def emit_status(message: str) -> None:
 
 
 def run(assistant: Assistant) -> int:
-    session_state.clean()
+    session_state.clean(assistant.data_dir())
 
-    data = read_input()
-    session_id = data.get("session_id", "")
-    session_state.reset(session_id, "preloaded")
+    data = assistant.read_input()
+    session_state.reset(data.session_id, "preloaded", assistant.data_dir())
     if engram_warning():
         return 0
     client = get_client(assistant.NAME)
     if client is None:
         return 0
 
-    cwd = data.get("cwd", "")
     try:
-        topic, error = session_start_topic(cwd)
+        topic, error = session_start_topic(data.cwd, assistant.data_dir())
         if error:
             emit_status(error)
             return 0
         if topic is None:
             return 0
-        search_topics, properties, _warnings = search_filters(cwd, session_id)
+        search_topics, properties, _warnings = search_filters(data.cwd, data.session_id, assistant.data_dir())
         results = client.memories.search(
             query=topic,
             user_id=get_user_id(),
@@ -73,7 +70,7 @@ def run(assistant: Assistant) -> int:
             (m for m in results if m.content), key=lambda m: m.created_at, reverse=True
         )
     except Exception as e:
-        debug("session start failed", source=data.get("source"), error=e)
+        debug("session start failed", error=e)
         emit_status(f"loading memories at session start failed: {e}")
         return 0
 
@@ -81,7 +78,6 @@ def run(assistant: Assistant) -> int:
 
     debug(
         "session start",
-        source=data.get("source"),
         topic=topic,
         fetched=len(newest_first),
         injected=len(injected),
@@ -93,7 +89,7 @@ def run(assistant: Assistant) -> int:
             f"Standing memory from Engram (topic {topic}), loaded once for the whole session. "
             "Apply it throughout unless the user says otherwise:\n" + text
         )
-    session_state.add(session_id, "preloaded", [m.id for m in injected])
+    session_state.add(data.session_id, "preloaded", [m.id for m in injected], assistant.data_dir())
     return 0
 
 

@@ -45,11 +45,12 @@ class SessionStartTopicTest(unittest.TestCase):
         self.addCleanup(tmp.cleanup)
         self.cwd = os.path.join(tmp.name, "repo")
         os.makedirs(self.cwd)
+        self.data_dir = tmp.name
         self.user_config = os.path.join(tmp.name, "config.json")
         self.schema = schema("DeveloperPreferences", "Processes")
         for patch in (
             unittest.mock.patch.object(config, "user_config_path", lambda: self.user_config),
-            unittest.mock.patch.object(core_search, "scope_schema", lambda: self.schema),
+            unittest.mock.patch.object(core_search, "scope_schema", lambda _: self.schema),
         ):
             patch.start()
             self.addCleanup(patch.stop)
@@ -59,7 +60,7 @@ class SessionStartTopicTest(unittest.TestCase):
             json.dump({"session_start": session_start}, f)
 
     def topic(self):
-        return core_search.session_start_topic(self.cwd)
+        return core_search.session_start_topic(self.cwd, self.data_dir)
 
     def test_defaults_to_developer_preferences_when_the_schema_has_it(self):
         self.assertEqual(self.topic(), ("DeveloperPreferences", None))
@@ -98,9 +99,10 @@ class SessionStartHookTest(unittest.TestCase):
         self.topic = ("DeveloperPreferences", None)
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
+        self.data = tmp.name
         client = SimpleNamespace(memories=SimpleNamespace(search=self.search))
         patches = [
-            unittest.mock.patch.object(session_start, "session_start_topic", lambda _: self.topic),
+            unittest.mock.patch.object(session_start, "session_start_topic", lambda _, __: self.topic),
             unittest.mock.patch.dict(os.environ, {"CLAUDE_PLUGIN_DATA": tmp.name}),
         ]
         for hook in (session_start, search):
@@ -177,7 +179,7 @@ class SessionStartHookTest(unittest.TestCase):
 
     def test_an_empty_topic_injects_nothing(self):
         self.assertEqual(self.run_hook(), "")
-        self.assertEqual(session_state.load(SESSION, "preloaded"), set())
+        self.assertEqual(session_state.load(SESSION, "preloaded", self.data), set())
 
     def test_a_config_error_is_reported_without_fetching(self):
         self.topic = (None, "config session_start.topic must be a topic name")
@@ -214,14 +216,14 @@ class SessionStartHookTest(unittest.TestCase):
         self.assertLess(context.index("newest"), context.index("middle"))
         self.assertNotIn("oldest", context)
         self.assertNotIn(session_start.TRUNCATED, context)
-        self.assertEqual(session_state.load(SESSION, "preloaded"), {"newest", "middle"})
+        self.assertEqual(session_state.load(SESSION, "preloaded", self.data), {"newest", "middle"})
 
     def test_a_memory_too_long_to_fit_is_cut_not_dropped(self):
         self.results = [memory("prefs", "p" * (session_start.MAX_CHARS * 2))]
         context = self.run_hook()
         self.assertIn(session_start.TRUNCATED, context)
         self.assertLess(len(context), session_start.MAX_CHARS + 500)
-        self.assertEqual(session_state.load(SESSION, "preloaded"), {"prefs"})
+        self.assertEqual(session_state.load(SESSION, "preloaded", self.data), {"prefs"})
 
 
 if __name__ == "__main__":
