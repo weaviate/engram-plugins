@@ -2,10 +2,9 @@
 
 import json
 import os
-import sys
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from dataclasses import dataclass, fields
+from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
 
@@ -21,14 +20,6 @@ class InputData:
     prompt: str = ""
     transcript_path: str = ""
     turn_id: str = ""
-
-    @classmethod
-    def from_payload(cls, payload: dict[str, Any]) -> "InputData":
-        """Each hook event sends a different subset, so unknown keys are dropped and missing or
-        null ones take the default."""
-        return cls(
-            **{f.name: payload[f.name] for f in fields(cls) if payload.get(f.name) is not None}
-        )
 
 
 @dataclass
@@ -61,10 +52,10 @@ class Assistant(ABC):
     # reads it as "continue the turn, using stderr as the prompt", so an assistant has to opt in.
     STORE_FAILURE_EXIT: int = 0
 
+    @abstractmethod
     def read_input(self) -> InputData:
-        """The hook payload on stdin, for an assistant whose names already match InputData's.
-        Malformed JSON raises — a hook should never run on garbage input."""
-        return InputData.from_payload(json.load(sys.stdin))
+        """The hook payload on stdin. Malformed JSON raises — a hook should never run on garbage
+        input."""
 
     @abstractmethod
     def read_entry(self, raw: dict[str, Any]) -> TranscriptEntry | None:

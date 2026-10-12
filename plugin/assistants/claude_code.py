@@ -11,10 +11,20 @@ class ClaudeCode(Assistant):
     STORE_FAILURE_EXIT = 2  # asyncRewake turns this into a wake showing our stderr
 
     def read_input(self) -> InputData:
+        # hook payloads use snake case
         payload = json.load(sys.stdin)
-        return InputData.from_payload({**payload, "turn_id": payload.get("prompt_id")})
+        return InputData(
+            stop_hook_active=payload.get("stop_hook_active") or False,
+            last_assistant_message=payload.get("last_assistant_message") or "",
+            cwd=payload.get("cwd") or "",
+            session_id=payload.get("session_id") or "",
+            prompt=payload.get("prompt") or "",
+            transcript_path=payload.get("transcript_path") or "",
+            turn_id=payload.get("prompt_id") or "",
+        )
 
     def read_entry(self, raw: dict[str, Any]) -> TranscriptEntry:
+        # transcript entries use camel case
         content = raw.get("message", raw).get("content")
         origin = raw.get("origin")
         return TranscriptEntry(

@@ -1,11 +1,25 @@
+import json
+import sys
 from typing import Any
 
-from core.classes import Assistant, TranscriptEntry
+from core.classes import Assistant, InputData, TranscriptEntry
 
 
 class Codex(Assistant):
     NAME = "codex"
     MANIFEST_DIR = ".codex-plugin"
+
+    def read_input(self) -> InputData:
+        payload = json.load(sys.stdin)
+        return InputData(
+            stop_hook_active=payload.get("stop_hook_active") or False,
+            last_assistant_message=payload.get("last_assistant_message") or "",
+            cwd=payload.get("cwd") or "",
+            session_id=payload.get("session_id") or "",
+            prompt=payload.get("prompt") or "",
+            transcript_path=payload.get("transcript_path") or "",
+            turn_id=payload.get("turn_id") or "",
+        )
 
     def read_entry(self, raw: dict[str, Any]) -> TranscriptEntry | None:
         """Rollout entries wrap a message in `payload`, and use a `developer` role for injected
@@ -23,8 +37,6 @@ class Codex(Assistant):
 
 
 if __name__ == "__main__":
-    import sys
-
     from core.hooks import dispatch
 
     sys.exit(dispatch(Codex(), sys.argv))
