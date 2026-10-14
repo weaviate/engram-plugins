@@ -47,7 +47,7 @@ def run(assistant: Assistant) -> int:
     session_state.reset(data.session_id, "preloaded", assistant.data_dir())
     if engram_warning():
         return 0
-    client = get_client(assistant.NAME)
+    client = get_client(assistant.name)
     if client is None:
         return 0
 
