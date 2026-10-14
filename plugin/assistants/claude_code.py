@@ -6,9 +6,9 @@ from core.classes import Assistant, InputData, TranscriptEntry
 
 
 class ClaudeCode(Assistant):
-    NAME = "claude"
-    MANIFEST_DIR = ".claude-plugin"
-    DATA_DIR_ENV = "CLAUDE_PLUGIN_DATA"
+    name = "claude"
+    manifest_dir = ".claude-plugin"
+    data_dir_env = "CLAUDE_PLUGIN_DATA"
     STORE_FAILURE_EXIT = 2  # asyncRewake turns this into a wake showing our stderr
 
     def read_input(self) -> InputData:

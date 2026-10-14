@@ -27,7 +27,7 @@ def run(assistant: Assistant) -> int:
     # Recall still runs for these turns, but the user half is machine markup and the work they
     # describe is stored with the human turn that follows.
     if assistant.is_automated(data):
-        debug("store skipped", turn=data.turn_id, assistant=assistant.NAME)
+        debug("store skipped", turn=data.turn_id, assistant=assistant.name)
         return 0
 
     answer = data.last_assistant_message.strip()
@@ -41,7 +41,7 @@ def run(assistant: Assistant) -> int:
     if not messages:
         return 0
 
-    client = get_client(assistant.NAME)
+    client = get_client(assistant.name)
     if client is None:
         debug("store unavailable", turn=data.turn_id, reason="no api key")
         return 0  # search surfaces a missing key/SDK immediately; nothing to wake about here

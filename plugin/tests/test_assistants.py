@@ -175,9 +175,9 @@ class ReadInputTest(unittest.TestCase):
         """Hosts send more than the hooks use, and each event only a subset."""
         for assistant in EVERY_ASSISTANT:
             data = read(assistant, {"hook_event_name": "Stop", "cwd": "/repo", "prompt": None})
-            self.assertEqual(data.cwd, "/repo", assistant.NAME)
-            self.assertEqual(data.prompt, "", assistant.NAME)
-            self.assertFalse(data.stop_hook_active, assistant.NAME)
+            self.assertEqual(data.cwd, "/repo", assistant.name)
+            self.assertEqual(data.prompt, "", assistant.name)
+            self.assertFalse(data.stop_hook_active, assistant.name)
 
 
 class WiringTest(unittest.TestCase):
@@ -195,7 +195,7 @@ class WiringTest(unittest.TestCase):
         the first turn that needs it."""
 
         class Incomplete(Assistant):
-            NAME = "incomplete"
+            name = "incomplete"
 
         with self.assertRaises(TypeError):
             Incomplete()
@@ -214,7 +214,7 @@ class WiringTest(unittest.TestCase):
                 cwd=root,
                 env={**os.environ, "PYTHONPATH": str(root), "PYTHONWARNINGS": "always"},
             )
-            self.assertNotIn("RuntimeWarning", result.stderr, assistant.NAME)
+            self.assertNotIn("RuntimeWarning", result.stderr, assistant.name)
 
     def test_every_assistant_is_wired_end_to_end(self):
         """Each registered assistant needs a manifest naming its own hooks file, and commands in
@@ -225,7 +225,7 @@ class WiringTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(root, "hooks", "hooks.json")))
         for assistant in EVERY_ASSISTANT:
             module = type(assistant).__module__
-            with open(os.path.join(root, assistant.MANIFEST_DIR, "plugin.json")) as f:
+            with open(os.path.join(root, assistant.manifest_dir, "plugin.json")) as f:
                 manifest = json.load(f)
             hooks_path = manifest["hooks"]
             self.assertTrue(hooks_path.startswith("./"), hooks_path)
@@ -237,11 +237,11 @@ class WiringTest(unittest.TestCase):
                 for group in event
                 for hook in group["hooks"]
             ]
-            self.assertTrue(commands, assistant.NAME)
+            self.assertTrue(commands, assistant.name)
             for command in commands:
                 self.assertIn(f"-m {module} ", command)
                 # with-venv.sh builds the venv where this says; the hook reads the same variable
-                self.assertIn(f'"${{{assistant.DATA_DIR_ENV}}}"', command)
+                self.assertIn(f'"${{{assistant.data_dir_env}}}"', command)
 
     def test_the_manifests_agree_on_the_version(self):
         """One plugin shipped to several assistants. Nothing else keeps these in step, and the
@@ -249,7 +249,7 @@ class WiringTest(unittest.TestCase):
         root = os.path.join(os.path.dirname(__file__), "..")
         versions = set()
         for assistant in EVERY_ASSISTANT:
-            with open(os.path.join(root, assistant.MANIFEST_DIR, "plugin.json")) as f:
+            with open(os.path.join(root, assistant.manifest_dir, "plugin.json")) as f:
                 versions.add(json.load(f)["version"])
         self.assertEqual(len(versions), 1, versions)
 

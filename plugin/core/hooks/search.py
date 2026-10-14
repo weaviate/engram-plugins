@@ -72,7 +72,7 @@ def run(assistant: Assistant) -> int:
         emit(status=[tag(warning)])
         return 0
 
-    client = get_client(assistant.NAME)
+    client = get_client(assistant.name)
     if client is None:
         emit(status=[tag("client unavailable.")])
         return 0
