@@ -170,3 +170,5 @@ To add a new source system, implement one adapter module in `plugin/core/migrate
 | `ENGRAM_API_KEY`  | Your Engram API key (required).                               |
 | `ENGRAM_USER_ID`  | Override your identity (defaults to `git config user.email`). |
 | `ENGRAM_BASE_URL` | Point at a different Engram endpoint.                         |
+| `ENGRAM_TIMEOUT`  | Seconds to allow an Engram call (default 10).                 |
+| `ENGRAM_DEBUG`    | Print a line per recall/store to stderr, visible with `claude --debug`. |

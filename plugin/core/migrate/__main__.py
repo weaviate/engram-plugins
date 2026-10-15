@@ -52,6 +52,15 @@ def _parse_kv(pairs, flag):
     return out
 
 
+def _data_dir():
+    """Set by bin/engram-migrate, which launches this under every host. No fallback on purpose:
+    a guessed path diverges from the one with-venv.sh builds the venv in."""
+    d = os.environ.get("CLAUDE_PLUGIN_DATA")
+    if not d:
+        raise RuntimeError("CLAUDE_PLUGIN_DATA not set — run this through bin/engram-migrate")
+    return d
+
+
 def _schema(execute_mode):
     """The cached/fetched group schema — needed only to learn which scope properties the
     group requires (topics are Engram's own concern: extraction classifies memories, so no
@@ -61,7 +70,7 @@ def _schema(execute_mode):
     try:
         from ..scope import scope_schema
 
-        return scope_schema()
+        return scope_schema(_data_dir())
     except Exception as e:
         if execute_mode:
             sys.exit(
@@ -92,7 +101,7 @@ def _props_builder(schema, source_name, find_dir, map_overrides, extra):
         d = find_dir(project) if project else None
         if d:
             try:
-                props, _user_required, _unresolved = resolve_scope(d, marker)
+                props, _user_required, _unresolved = resolve_scope(d, marker, _data_dir())
             except Exception as e:
                 # one project's broken .engram.json, or an unreachable schema on an
                 # uncached dry-run, must not abort the whole migration — the project is

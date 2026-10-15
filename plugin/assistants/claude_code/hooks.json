@@ -1,0 +1,29 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/runtime/with-venv.sh\" \"${CLAUDE_PLUGIN_DATA}\" -m assistants.claude_code search",
+            "statusMessage": "Recalling memories from Engram…"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/runtime/with-venv.sh\" \"${CLAUDE_PLUGIN_DATA}\" -m assistants.claude_code store",
+            "asyncRewake": true,
+            "statusMessage": "Saving memory to Engram…"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Migration CLI launcher. Unlike hooks, a CLI isn't handed CLAUDE_PLUGIN_ROOT/DATA by the
-# host, so this derives them: ROOT always from this script's own location (a stale host
-# value pointing at another install would break with-venv.sh), DATA from the host env when
-# set, else from the installed cache/<marketplace>/<plugin>/<version> layout (matching the
-# host's data/<plugin>-<marketplace> convention). A dev checkout gets a fixed fallback —
-# ensure_deps builds the venv there idempotently.
+# Migration CLI launcher. Unlike hooks, a CLI isn't handed the plugin data dir by the host,
+# so this derives it: from the host env when set, else from the installed
+# cache/<marketplace>/<plugin>/<version> layout (matching the host's
+# data/<plugin>-<marketplace> convention). A dev checkout gets a fixed fallback —
+# ensure_deps builds the venv there idempotently. core.migrate reads it back from
+# CLAUDE_PLUGIN_DATA.
 set -euo pipefail
 SELF="$(cd "$(dirname "$0")" && pwd -P)"
 ROOT="$(dirname "$SELF")"
@@ -19,5 +19,4 @@ if [ -z "${CLAUDE_PLUGIN_DATA:-}" ]; then
   fi
   export CLAUDE_PLUGIN_DATA
 fi
-export CLAUDE_PLUGIN_ROOT="$ROOT"
-exec bash "$ROOT/hooks/with-venv.sh" -m core.migrate "$@"
+exec bash "$ROOT/runtime/with-venv.sh" "$CLAUDE_PLUGIN_DATA" -m core.migrate "$@"

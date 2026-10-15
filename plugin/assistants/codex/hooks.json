@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/with-venv.sh\" -m core.hooks.search",
+            "command": "bash \"${PLUGIN_ROOT}/runtime/with-venv.sh\" \"${PLUGIN_DATA}\" -m assistants.codex search",
             "statusMessage": "Recalling memories from Engram…"
           }
         ]
@@ -18,8 +18,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/with-venv.sh\" -m core.hooks.store",
-            "asyncRewake": true,
+            "command": "bash \"${PLUGIN_ROOT}/runtime/with-venv.sh\" \"${PLUGIN_DATA}\" -m assistants.codex store",
+            "async": true,
             "statusMessage": "Saving memory to Engram…"
           }
         ]
