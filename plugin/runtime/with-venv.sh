@@ -22,4 +22,7 @@ PY="$DATA/venv/bin/python"
 [ -f "$DATA/venv/install-spec" ] || python3 "$ROOT/runtime/ensure_deps.py" "$DATA" >&2
 [ -x "$PY" ] || PY="$(command -v python3 || command -v python)"
 export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
+# Hooks run from the user's project, which `python -m` would put ahead of the plugin root, letting
+# a project's own `core` or `assistants` package shadow ours. Python 3.11+, the venv's floor.
+export PYTHONSAFEPATH=1
 exec "$PY" "$@"
