@@ -26,14 +26,19 @@ class Codex(Assistant):
         """Rollout entries wrap a message in `payload`, and use a `developer` role for injected
         context nobody typed."""
         message = raw.get("payload") or {}
-        if message.get("type") != "message":
+        if message.get("type") != "message" or not message.get("role"):
             return None
+        
         blocks = message.get("content") or []
+        text="\n".join(
+            b["text"] for b in blocks if isinstance(b, dict) and b.get("text")
+        ).strip()
+        if not text:
+            return None
+
         return TranscriptEntry(
             role=message.get("role", ""),
-            text="\n".join(
-                b["text"] for b in blocks if isinstance(b, dict) and b.get("text")
-            ).strip(),
+            text=text,
         )
 
 
