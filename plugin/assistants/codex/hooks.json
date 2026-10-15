@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${PLUGIN_ROOT}/hooks/with-venv.sh\" \"${PLUGIN_DATA}\" -m assistants.codex session_start",
+            "command": "bash \"${PLUGIN_ROOT}/runtime/with-venv.sh\" \"${PLUGIN_DATA}\" -m assistants.codex session_start",
             "statusMessage": "Starting Engram…"
           }
         ]
@@ -43,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${PLUGIN_ROOT}/hooks/with-venv.sh\" \"${PLUGIN_DATA}\" -m assistants.codex post_compact"
+            "command": "bash \"${PLUGIN_ROOT}/runtime/with-venv.sh\" \"${PLUGIN_DATA}\" -m assistants.codex post_compact"
           }
         ]
       }

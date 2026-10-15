@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/with-venv.sh\" \"${CLAUDE_PLUGIN_DATA}\" -m assistants.claude_code session_start",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/runtime/with-venv.sh\" \"${CLAUDE_PLUGIN_DATA}\" -m assistants.claude_code session_start",
             "statusMessage": "Starting Engram…"
           }
         ]
@@ -43,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/with-venv.sh\" \"${CLAUDE_PLUGIN_DATA}\" -m assistants.claude_code post_compact"
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/runtime/with-venv.sh\" \"${CLAUDE_PLUGIN_DATA}\" -m assistants.claude_code post_compact"
           }
         ]
       }
