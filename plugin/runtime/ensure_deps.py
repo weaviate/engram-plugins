@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Ensure the third-party Engram SDK is installed in the plugin's venv. Idempotent.
 
-Runs on demand from hooks/with-venv.sh until a successful install is recorded, so the plugin
+Runs on demand from runtime/with-venv.sh until a successful install is recorded, so the plugin
 works on the first prompt after install without a restart — the one-time build happens on that
 prompt.
 
 The core package itself ships inside this plugin dir and is imported straight from
-the plugin root (see hooks/with-venv.sh), so the ONLY thing installed here is the SDK pinned
+the plugin root (see runtime/with-venv.sh), so the ONLY thing installed here is the SDK pinned
 in ../requirements.txt. Re-installs when that file changes (the marker stores its contents).
 Always exits 0 — a flaky network must never block a coding session. If the install fails the SDK
 stays missing and the hook's `import engram` errors loudly; with-venv.sh re-runs this on the next

@@ -25,10 +25,10 @@ CODEX = Codex()
 
 
 def _every_assistant():
-    """Found on disk, so a new assistant module has to satisfy the wiring checks below."""
+    """Found on disk, so a new assistant package has to satisfy the wiring checks below."""
     found = []
-    for path in sorted(pathlib.Path(__file__).parent.parent.glob("assistants/[!_]*.py")):
-        module = importlib.import_module(f"assistants.{path.stem}")
+    for path in sorted(pathlib.Path(__file__).parent.parent.glob("assistants/*/__init__.py")):
+        module = importlib.import_module(f"assistants.{path.parent.name}")
         found += [
             value()
             for value in vars(module).values()
@@ -200,11 +200,10 @@ class WiringTest(unittest.TestCase):
         with self.assertRaises(TypeError):
             Incomplete()
 
-    def test_running_an_assistant_does_not_double_import_it(self):
-        """assistants/__init__.py must stay free of imports. Adding `from .claude_code import
-        ClaudeCode` there is the obvious edit, and it makes `python -m assistants.claude_code`
-        execute the module twice — two distinct classes, and a RuntimeWarning on stderr for every
-        hook invocation."""
+    def test_every_assistant_runs_as_a_module(self):
+        """Hooks run `python -m assistants.<name>`, which needs the package's __main__.py. Nothing
+        may import that module: running it would then execute it twice, with a RuntimeWarning on
+        stderr for every hook invocation."""
         root = pathlib.Path(__file__).parent.parent
         for assistant in EVERY_ASSISTANT:
             result = subprocess.run(
@@ -214,6 +213,7 @@ class WiringTest(unittest.TestCase):
                 cwd=root,
                 env={**os.environ, "PYTHONPATH": str(root), "PYTHONWARNINGS": "always"},
             )
+            self.assertIn("expected one of", result.stderr, assistant.name)
             self.assertNotIn("RuntimeWarning", result.stderr, assistant.name)
 
     def test_every_assistant_is_wired_end_to_end(self):

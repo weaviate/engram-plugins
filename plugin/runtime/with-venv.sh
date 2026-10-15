@@ -19,7 +19,7 @@ PY="$DATA/venv/bin/python"
 # install-spec marker only after pip succeeds). Gating on the marker — not just the venv python —
 # means a partial install (venv created but pip failed) retries next prompt instead of crashing on
 # `import engram` forever. Idempotent once installed.
-[ -f "$DATA/venv/install-spec" ] || python3 "$ROOT/hooks/ensure_deps.py" "$DATA" >&2
+[ -f "$DATA/venv/install-spec" ] || python3 "$ROOT/runtime/ensure_deps.py" "$DATA" >&2
 [ -x "$PY" ] || PY="$(command -v python3 || command -v python)"
 export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
 exec "$PY" "$@"

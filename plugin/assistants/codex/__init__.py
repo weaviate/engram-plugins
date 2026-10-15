@@ -40,9 +40,3 @@ class Codex(Assistant):
             role=message.get("role", ""),
             text=text,
         )
-
-
-if __name__ == "__main__":
-    from core.hooks import dispatch
-
-    sys.exit(dispatch(Codex(), sys.argv))

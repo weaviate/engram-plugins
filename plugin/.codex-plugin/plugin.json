@@ -6,6 +6,6 @@
     "name": "Weaviate"
   },
   "homepage": "https://docs.weaviate.io/engram",
-  "hooks": "./hooks/codex.json",
+  "hooks": "./assistants/codex/hooks.json",
   "skills": "./skills/"
 }

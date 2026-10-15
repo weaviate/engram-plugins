@@ -71,9 +71,3 @@ def _is_tool_only(content: Any) -> bool:
         types = {b.get("type") for b in content if isinstance(b, dict)}
         return bool(types) and types.issubset({"tool_result", "tool_use"})
     return False
-
-
-if __name__ == "__main__":
-    from core.hooks import dispatch
-
-    sys.exit(dispatch(ClaudeCode(), sys.argv))

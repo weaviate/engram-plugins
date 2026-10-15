@@ -19,4 +19,4 @@ if [ -z "${CLAUDE_PLUGIN_DATA:-}" ]; then
   fi
   export CLAUDE_PLUGIN_DATA
 fi
-exec bash "$ROOT/hooks/with-venv.sh" "$CLAUDE_PLUGIN_DATA" -m core.migrate "$@"
+exec bash "$ROOT/runtime/with-venv.sh" "$CLAUDE_PLUGIN_DATA" -m core.migrate "$@"
