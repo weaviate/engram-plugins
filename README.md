@@ -7,6 +7,8 @@ decisions, and project context across sessions — and recalls what's relevant b
 - **Recall** — before each answer, relevant memories are fetched and added to the conversation,
   leaving out what the current session saved, which Claude already has.
 - **Store** — after each turn, the exchange is saved so it can be recalled later.
+- **Preferences** — when a session starts, your preferences are loaded once for the whole
+  session, and recall before each answer leaves them out.
 
 Memory is best-effort: it never blocks or breaks a session. When something needs your attention
 (bad key, misconfigured scope), Claude surfaces a short `Engram · …` note at the top of its reply.
@@ -101,6 +103,23 @@ The JSON **shape** decides — no ambiguity:
 
 - `search.properties` — restrict recall to memories matching these scope keys.
 - `search.topics` — restrict recall to specific memory topics, optionally with their own filters.
+
+### Session start
+
+With the default (quickstart) Engram project, your `DeveloperPreferences` memory is loaded when a
+session starts and again after a compaction, and recall before each answer leaves it out. No
+configuration needed.
+
+`session_start.topics` loads a different list of topics instead, and `[]` turns it off:
+
+```json
+{ "session_start": { "topics": ["DeveloperPreferences", "my_processes"] } }
+```
+
+Any topic works, but **bounded** topics are recommended: Engram keeps one memory per scope in
+each and rewrites that memory as it learns, as it does for `DeveloperPreferences`. Unbounded
+topics load as many memories as fit, chosen from at most 100 across all the listed topics, so they
+only suit small topics. When not everything fits, topics listed first take precedence.
 
 ### Inferred configuration
 
