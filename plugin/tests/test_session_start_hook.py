@@ -23,12 +23,12 @@ from core.hooks import post_compact, search, session_start  # noqa: E402
 SESSION = "0c9f6d1e-5a7b-4c2d-9e8f-1a2b3c4d5e6f"
 
 
-def memory(memory_id, content, created_at="2026-10-07T12:00:00Z"):
+def memory(memory_id, content, created_at="2026-10-07T12:00:00Z", topic="DeveloperPreferences"):
     return Memory(
         id=memory_id,
         project_id="p",
         content=content,
-        topic="DeveloperPreferences",
+        topic=topic,
         group="default",
         created_at=created_at,
         updated_at=created_at,
@@ -39,7 +39,7 @@ def schema(*topic_names):
     return {"raw": {"topics": [{"topic_name": name} for name in topic_names]}}
 
 
-class SessionStartTopicTest(unittest.TestCase):
+class SessionStartTopicsTest(unittest.TestCase):
     def setUp(self):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
@@ -59,50 +59,51 @@ class SessionStartTopicTest(unittest.TestCase):
         with open(path, "w") as f:
             json.dump({"session_start": session_start}, f)
 
-    def topic(self):
-        return core_search.session_start_topic(self.cwd, self.data_dir)
+    def topics(self):
+        return core_search.session_start_topics(self.cwd, self.data_dir)
 
     def test_defaults_to_developer_preferences_when_the_schema_has_it(self):
-        self.assertEqual(self.topic(), ("DeveloperPreferences", None))
+        self.assertEqual(self.topics(), (["DeveloperPreferences"], None))
         self.schema = schema("Processes")
-        self.assertEqual(self.topic(), (None, None))
+        self.assertEqual(self.topics(), ([], None))
 
-    def test_config_chooses_the_topic(self):
-        self.configure(self.user_config, {"topic": "Processes"})
-        self.assertEqual(self.topic(), ("Processes", None))
+    def test_config_chooses_the_topics_in_order(self):
+        self.configure(self.user_config, {"topics": ["Processes", " DeveloperPreferences ", "Processes"]})
+        self.assertEqual(self.topics(), (["Processes", "DeveloperPreferences"], None))
 
     def test_a_topic_missing_from_the_schema_is_still_used(self):
-        self.configure(self.user_config, {"topic": "tooling_preferences"})
-        self.assertEqual(self.topic(), ("tooling_preferences", None))
+        self.configure(self.user_config, {"topics": ["tooling_preferences"]})
+        self.assertEqual(self.topics(), (["tooling_preferences"], None))
 
-    def test_null_or_empty_turns_it_off(self):
-        for off in (None, "", "  "):
-            self.configure(self.user_config, {"topic": off})
-            self.assertEqual(self.topic(), (None, None), off)
+    def test_an_empty_list_turns_it_off(self):
+        for off in ([], ["", " "]):
+            self.configure(self.user_config, {"topics": off})
+            self.assertEqual(self.topics(), ([], None), off)
 
     def test_local_config_overrides_global(self):
-        self.configure(self.user_config, {"topic": "Processes"})
-        self.configure(os.path.join(self.cwd, ".engram.json"), {"topic": None})
-        self.assertEqual(self.topic(), (None, None))
+        self.configure(self.user_config, {"topics": ["Processes", "DeveloperPreferences"]})
+        self.configure(os.path.join(self.cwd, ".engram.json"), {"topics": []})
+        self.assertEqual(self.topics(), ([], None))
 
-    def test_a_topic_that_is_not_a_name_is_an_error(self):
-        self.configure(self.user_config, {"topic": ["DeveloperPreferences"]})
-        topic, error = self.topic()
-        self.assertIsNone(topic)
-        self.assertIn("session_start.topic", error)
+    def test_anything_but_a_list_of_names_is_an_error(self):
+        for bad in ("DeveloperPreferences", None, [{"name": "DeveloperPreferences"}], ["Processes", None]):
+            self.configure(self.user_config, {"topics": bad})
+            topics, error = self.topics()
+            self.assertEqual(topics, [], bad)
+            self.assertIn("session_start.topics", error)
 
 
 class SessionStartHookTest(unittest.TestCase):
     def setUp(self):
         self.results = []
         self.calls = []
-        self.topic = ("DeveloperPreferences", None)
+        self.topics = (["DeveloperPreferences"], None)
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.data = tmp.name
         client = SimpleNamespace(memories=SimpleNamespace(search=self.search))
         patches = [
-            unittest.mock.patch.object(session_start, "session_start_topic", lambda _, __: self.topic),
+            unittest.mock.patch.object(session_start, "session_start_topics", lambda _, __: self.topics),
             unittest.mock.patch.dict(os.environ, {"CLAUDE_PLUGIN_DATA": tmp.name}),
         ]
         for hook in (session_start, search):
@@ -140,13 +141,27 @@ class SessionStartHookTest(unittest.TestCase):
         self.assertEqual(call["topics"], ["DeveloperPreferences"])
         self.assertIsInstance(call["retrieval_config"], FetchRetrieval)
 
+    def test_injects_each_topic_in_the_order_configured(self):
+        self.topics = (["DeveloperPreferences", "Processes"], None)
+        self.results = [
+            memory("process", "release on fridays", "2026-10-09T00:00:00Z", topic="Processes"),
+            memory("prefs", "prefers small commits", "2026-10-01T00:00:00Z"),
+        ]
+        context = self.run_hook()
+        self.assertIn("topics DeveloperPreferences, Processes", context)
+        self.assertLess(context.index("prefers small commits"), context.index("release on fridays"))
+        (call,) = self.calls
+        self.assertEqual(call["topics"], ["DeveloperPreferences", "Processes"])
+        self.assertEqual(session_state.load(SESSION, "preloaded", self.data), {"prefs", "process"})
+
     def test_uses_the_topic_filter_configured_for_search(self):
+        self.topics = (["DeveloperPreferences", "Processes"], None)
         cross_repo = Topic(name="DeveloperPreferences", properties={"repo_name": None})
-        filters = ([cross_repo, "Processes"], {"repo_name": "owner/repo"}, [])
+        filters = ([cross_repo, "Guidelines"], {"repo_name": "owner/repo"}, [])
         with unittest.mock.patch.object(session_start, "search_filters", lambda *_: filters):
             self.run_hook()
         (call,) = self.calls
-        self.assertEqual(call["topics"], [cross_repo])
+        self.assertEqual(call["topics"], [cross_repo, "Processes"])
         self.assertEqual(call["properties"], {"repo_name": "owner/repo"})
 
     def test_search_skips_what_session_start_injected(self):
@@ -172,8 +187,8 @@ class SessionStartHookTest(unittest.TestCase):
         self.results = [memory("prefs", "prefers small commits")]
         self.assertIn("prefers small commits", self.run_hook(search, prompt="commits?"))
 
-    def test_no_topic_fetches_nothing(self):
-        self.topic = (None, None)
+    def test_no_topics_fetches_nothing(self):
+        self.topics = ([], None)
         self.assertEqual(self.run_hook(), "")
         self.assertEqual(self.calls, [])
 
@@ -182,8 +197,8 @@ class SessionStartHookTest(unittest.TestCase):
         self.assertEqual(session_state.load(SESSION, "preloaded", self.data), set())
 
     def test_a_config_error_is_reported_without_fetching(self):
-        self.topic = (None, "config session_start.topic must be a topic name")
-        self.assertIn("Engram · config session_start.topic", self.run_hook())
+        self.topics = ([], "config session_start.topics must be a list of topic names")
+        self.assertIn("Engram · config session_start.topics", self.run_hook())
         self.assertEqual(self.calls, [])
 
     def test_a_failed_fetch_is_reported(self):

@@ -110,15 +110,16 @@ With the default (quickstart) Engram project, your `DeveloperPreferences` memory
 session starts and again after a compaction, and recall before each answer leaves it out. No
 configuration needed.
 
-`session_start.topic` loads a different topic instead, and `null` turns it off:
+`session_start.topics` loads a different list of topics instead, and `[]` turns it off:
 
 ```json
-{ "session_start": { "topic": "my_preferences" } }
+{ "session_start": { "topics": ["DeveloperPreferences", "my_processes"] } }
 ```
 
-Any topic works, but a **bounded** topic is recommended: Engram keeps one memory per scope in it
-and rewrites that memory as it learns, as it does for `DeveloperPreferences`. An unbounded topic
-loads as many memories as fit, chosen from at most 100, so it only suits a small topic.
+Any topic works, but **bounded** topics are recommended: Engram keeps one memory per scope in
+each and rewrites that memory as it learns, as it does for `DeveloperPreferences`. Unbounded
+topics load as many memories as fit, chosen from at most 100 across all the listed topics, so they
+only suit small topics. When not everything fits, topics listed first take precedence.
 
 ### Inferred configuration
 

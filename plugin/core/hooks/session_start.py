@@ -1,6 +1,7 @@
-"""SessionStart hook: delete stale session state, then inject the session start topic."""
+"""SessionStart hook: delete stale session state, then inject the session start topics."""
 
 import json
+from collections.abc import Iterable
 
 from engram import FetchRetrieval, Memory, Topic
 
@@ -10,7 +11,7 @@ from core import (
     get_client,
     get_user_id,
     search_filters,
-    session_start_topic,
+    session_start_topics,
     session_state,
 )
 from core.classes import Assistant
@@ -52,41 +53,40 @@ def run(assistant: Assistant) -> int:
         return 0
 
     try:
-        topic, error = session_start_topic(data.cwd, assistant.data_dir())
+        topics, error = session_start_topics(data.cwd, assistant.data_dir())
         if error:
             emit_status(error)
             return 0
-        if topic is None:
+        if not topics:
             return 0
         search_topics, properties, _warnings = search_filters(data.cwd, data.session_id, assistant.data_dir())
         results = client.memories.search(
-            query=topic,
+            query=" ".join(topics),
             user_id=get_user_id(),
-            topics=[_with_search_filter(topic, search_topics)],
+            topics=[_with_search_filter(topic, search_topics) for topic in topics],
             retrieval_config=FetchRetrieval(limit=FETCH_LIMIT),
             properties=properties,
         )
-        newest_first = sorted(
-            (m for m in results if m.content), key=lambda m: m.created_at, reverse=True
-        )
+        ordered = _by_topic_then_newest((m for m in results if m.content), topics)
     except Exception as e:
         debug("session start failed", error=e)
         emit_status(f"loading memories at session start failed: {e}")
         return 0
 
-    injected, text = _fit(newest_first)
+    injected, text = _fit(ordered)
 
     debug(
         "session start",
-        topic=topic,
-        fetched=len(newest_first),
+        topics=topics,
+        fetched=len(ordered),
         injected=len(injected),
         chars=len(text),
     )
 
     if text:
         emit(
-            f"Standing memory from Engram (topic {topic}), loaded once for the whole session. "
+            f"Standing memory from Engram ({'topic' if len(topics) == 1 else 'topics'} "
+            f"{', '.join(topics)}), loaded once for the whole session. "
             "Apply it throughout unless the user says otherwise:\n" + text
         )
     session_state.add(data.session_id, "preloaded", [m.id for m in injected], assistant.data_dir())
@@ -98,6 +98,13 @@ def _with_search_filter(topic: str, search_topics: list[str | Topic] | None) -> 
         if isinstance(search_topic, Topic) and search_topic.name == topic:
             return search_topic
     return topic
+
+
+def _by_topic_then_newest(memories: Iterable[Memory], topics: list[str]) -> list[Memory]:
+    """Topics in the order configured, so the first ones get the space when not all fit."""
+    rank = {topic: i for i, topic in enumerate(topics)}
+    newest_first = sorted(memories, key=lambda m: m.created_at, reverse=True)
+    return sorted(newest_first, key=lambda m: rank.get(m.topic, len(topics)))
 
 
 def _fit(memories: list[Memory]) -> tuple[list[Memory], str]:

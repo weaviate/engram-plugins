@@ -1,5 +1,5 @@
 """Search-side scoping: build the Engram `topics` and cross-topic `properties` filters from
-the config `search` block, and pick the topic injected at session start."""
+the config `search` block, and pick the topics injected at session start."""
 
 from engram import Topic
 
@@ -11,7 +11,7 @@ from .scope import config_warnings, resolve_scope, scope_schema
 # "search": {"properties": []} to search broadly.
 DEFAULT_SEARCH_PROPERTIES = ["repo_name"]
 
-DEFAULT_SESSION_START_TOPIC = "DeveloperPreferences"
+DEFAULT_SESSION_START_TOPICS = ["DeveloperPreferences"]
 
 
 def _build_topics(spec, resolved):
@@ -86,19 +86,17 @@ def search_filters(cwd, session_id, data_dir):
     return topics, (cross or None), warnings
 
 
-def session_start_topic(cwd, data_dir):
-    """The topic injected in full at session start, from config `session_start.topic` (null
-    turns it off), else DEFAULT_SESSION_START_TOPIC if the cached schema has it. A bounded topic
-    is recommended. Returns (topic, error_message)."""
+def session_start_topics(cwd, data_dir):
+    """The topics injected in full at session start, from config `session_start.topics` ([] turns
+    it off), else the DEFAULT_SESSION_START_TOPICS the cached schema has. Bounded topics are
+    recommended. Returns (topics, error_message)."""
     session_start = load_config(cwd).get("session_start") or {}
-    if "topic" not in session_start:
-        if _schema_has_topic(DEFAULT_SESSION_START_TOPIC, data_dir):
-            return DEFAULT_SESSION_START_TOPIC, None
-        return None, None
-    topic = session_start["topic"]
-    if topic is not None and not isinstance(topic, str):
-        return None, "config session_start.topic must be a topic name, or null to turn it off"
-    return (topic or "").strip() or None, None
+    if "topics" not in session_start:
+        return [t for t in DEFAULT_SESSION_START_TOPICS if _schema_has_topic(t, data_dir)], None
+    topics = session_start["topics"]
+    if not isinstance(topics, list) or not all(isinstance(t, str) for t in topics):
+        return [], "config session_start.topics must be a list of topic names, or [] to turn it off"
+    return list(dict.fromkeys(t.strip() for t in topics if t.strip())), None
 
 
 def _schema_has_topic(name, data_dir):

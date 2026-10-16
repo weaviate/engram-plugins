@@ -1,6 +1,6 @@
 """Config from JSON files: ~/.engram/config.json (global) plus the current directory's
 .engram.json. Holds scope `properties` (how each value resolves), `search` (which
-topics/properties to filter) and `session_start` (which topic to inject). No env vars, no shell
+topics/properties to filter) and `session_start` (which topics to inject). No env vars, no shell
 quoting — structured config lives in files."""
 
 import json
