@@ -1,3 +1,6 @@
+> [!WARNING]
+> **We have decided to sunset Engram. Existing projects will continue to work until December 31st.**
+
 # Weaviate Engram Plugins
 
 Persistent, cross-session memory for **Claude Code**, backed by
